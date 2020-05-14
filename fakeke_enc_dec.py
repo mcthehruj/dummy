@@ -35,15 +35,17 @@ from os.path import basename
 def codecdecision(seq):
     d0 = b'(\x00\x00\x01[\xB0-\xBF])'                                       # mpeg2
     d1 = b'(\x00\x00[\x80-\x8F])'                                           # 263
+    d1_ex = b'(\x80\x00\x00[\x80-\x8F])'
     d2 = b'(\x00\x00\x01[\x68|\x67|\x65|\x61|\x41|\x21|\x01])'              # 264
     d3 = b'(\x00\x00\x01[\x40|\x41|\x42|\x43|\x44|\x4E|\x26|\x00|\x02|\x2A|\x10|\x12])'              # hevc 40, 41: VPS, 42, 43: SPS, 44: PPS, 4E: SEI, 26: IDR Frame
     seq0 = re.split(d0, seq);      del seq0[0];     seq0 = [x + y for x, y in zip(seq0[0::2], seq0[1::2])] # 뭔지 모르는 2A, 10 12 추가함
     seq1 = re.split(d1, seq);      del seq1[0];     seq1 = [x + y for x, y in zip(seq1[0::2], seq1[1::2])]
+    seq1_ex = re.split(d1_ex, seq);del seq1_ex[0];     seq1_ex = [x + y for x, y in zip(seq1_ex[0::2], seq1_ex[1::2])]
     seq2 = re.split(d2, seq);      del seq2[0];     seq2 = [x + y for x, y in zip(seq2[0::2], seq2[1::2])]
     seq3 = re.split(d3, seq);      del seq3[0];     seq3 = [x + y for x, y in zip(seq3[0::2], seq3[1::2])]
 
-    print("mpeg2: %d, 263: %d, 264: %d hevc: %d" % (len(seq0), len(seq1), len(seq2), len(seq3)))
-    cdx = [len(seq0), len(seq1), len(seq2), len(seq3)].index(max([len(seq0), len(seq1), len(seq2), len(seq3)]))
+    print("mpeg2: %d, 263: %d, 264: %d hevc: %d" % (len(seq0), len(seq1)-len(seq1_ex), len(seq2), len(seq3)))
+    cdx = [len(seq0), len(seq1)-len(seq1_ex), len(seq2), len(seq3)].index(max([len(seq0), len(seq1)-len(seq1_ex), len(seq2), len(seq3)]))
     return [seq0, seq1, seq2, seq3][cdx], cdx
 
 if (len(sys.argv) == 1):   #### goto 1:변조모드로    2:복조모드로    3:변조여부판단모드로    4:인자오류메세지출력으로
