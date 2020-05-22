@@ -37,7 +37,7 @@ def codecdecision(seq):
     d1 = b'(\x00\x00[\x80-\x8F])'                                           # 263
     d1_ex = b'(\x80\x00\x00[\x80-\x8F])'
     d2 = b'(\x00\x00\x01[\x68|\x67|\x65|\x61|\x41|\x21|\x01])'              # 264
-    d3 = b'(\x00\x00\x01[\x40|\x41|\x42|\x43|\x44|\x4E|\x26|\x00|\x02|\x2A|\x10|\x12])'              # hevc 40, 41: VPS, 42, 43: SPS, 44: PPS, 4E: SEI, 26: IDR Frame
+    d3 = b'(\x00\x00\x01[\x40|\x41|\x42|\x43|\x44|\x4E|\x26|\x28|\x00|\x02|\x2A|\x10|\x12])'              # hevc 40, 41: VPS, 42, 43: SPS, 44: PPS, 4E: SEI, 26: IDR Frame
     seq0 = re.split(d0, seq);      del seq0[0];     seq0 = [x + y for x, y in zip(seq0[0::2], seq0[1::2])] # 뭔지 모르는 2A, 10 12 추가함
     seq1 = re.split(d1, seq);      del seq1[0];     seq1 = [x + y for x, y in zip(seq1[0::2], seq1[1::2])]
     seq1_ex = re.split(d1_ex, seq);del seq1_ex[0];     seq1_ex = [x + y for x, y in zip(seq1_ex[0::2], seq1_ex[1::2])]
@@ -101,7 +101,7 @@ if goto == 1:                                                                   
                 VPScnt += 1
 
         for i in range(len(stream_h)):                          # 히든의 pps 뒤에 사용자 종료코드 넣음.. 복조시나리오때 활용
-            if stream_h[i][3]==0x40 or stream_h[i][3]==0x41 or stream_h[i][3]==0x42 or stream_h[i][3]==0x43 or stream_h[i][3]==0x44 or stream_h[i][3]==0x4E or stream_h[i][3]==0x26:
+            if stream_h[i][3]==0x40 or stream_h[i][3]==0x41 or stream_h[i][3]==0x42 or stream_h[i][3]==0x43 or stream_h[i][3]==0x44 or stream_h[i][3]==0x4E or stream_h[i][3]==0x26 or stream_h[i][3]==0x28:
                 stream_h[i] = stream_h[i] + b'\x55\x56\x57'
 
         for i, v in reversed(list(enumerate(stream_h))):                          # 0x4E 히든의 sei 메세지는 삭제한다
