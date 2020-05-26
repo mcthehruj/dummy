@@ -10,12 +10,12 @@ import PIL.Image
 import PIL.ImageTk
 import cv2
 from utils import *
-# from detect import*
 
-class LoadDisplay(object):
+
+class LoadDisplay(object):  #ui 영상창 클래스
+    #추가해야할 디스플레이 클래스 기능: 프로그래스바, 모든비디오시퀀스가 33ms의 프레임레이트를 가지는문제, 드래그시 클릭되는 문제
     pausedisplay = 1  # 클래스간 공통변수
     progressbar = 0
-
     def __init__(self, win, x, y):
         self.win = win
         self.frame = None
@@ -24,7 +24,7 @@ class LoadDisplay(object):
         self.y = y
         self.f_width = 352
         self.f_height = 288
-        self.video_source = ""  # ""D:/DProgram/Desktop/codes/ffmpeg데이터셋만들기/aaa/changingdata250/000016_1h.h264"
+        self.video_source = ""
         self.move_x = 0
         self.move_y = 0
         self.zoom_x = 1
@@ -70,92 +70,42 @@ class LoadDisplay(object):
         self.zoom_y = zoom
         frame = cv2.resize(self.frame, None, fx=self.zoom_x, fy=self.zoom_y, interpolation=cv2.INTER_LINEAR)
 
-
-
-
-    # def changetext(self, text,text2, default=True):
-    #     text.delete(1.0, END)
-    #     "MPEG-2", "H.263", "H.264", "HEVC", "IVC", "VP8", "JPEG", "JPEG2000", "BMP", "PNG", "TIFF"
-    #     name = self.find_ext2()
-    #     text.insert(END, name)
-    #     text2.insert(END, name + " file is loaded\n")
-
-############################
-
-    # def changedvideo(self, text, ext, str):
-    #     if str == 'e':
-    #         try:
-    #             self.vid = cv2.VideoCapture('encodeded' + ext)
-    #             text.insert(END, 'Encoded file loaded\n')
-    #
-    #             if not self.vid.isOpened():
-    #                 print("@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-    #                 print("@@@@ Sequence Read error TK")
-    #             else:
-    #                 ret, self.frame = self.get_frame()  # 로드시 초기 1프레임 띄우기
-    #                 self.frame_count = self.vid.get(cv2.CAP_PROP_FRAME_COUNT)
-    #                 self.zoom_x=1; self.zoom_y=1; self.move_x=0; self.move_y=0;
-    #                 self.frame = cv2.resize(self.frame, fx=self.zoom_x, fy=self.zoom_y, interpolation=cv2.INTER_LINEAR)
-    #                 LoadDisplay.pausedisplay = 1
-    #                 self.frame_num_p = 0
-    #         except:
-    #             text.insert(END, 'reading Encoded file failed')
-    #     else:
-    #         try:
-    #             self.vid = cv2.VideoCapture('reconstructed' + ext)
-    #             text.insert(END, 'Encoded file loaded\n')
-    #
-    #             if not self.vid.isOpened():
-    #                 print("@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-    #                 print("@@@@ Sequence Read error TK")
-    #             else:
-    #                 ret, self.frame = self.get_frame()  # 로드시 초기 1프레임 띄우기
-    #                 self.frame_count = self.vid.get(cv2.CAP_PROP_FRAME_COUNT)
-    #                 self.zoom_x = 1;
-    #                 self.zoom_y = 1;
-    #                 self.move_x = 0;
-    #                 self.move_y = 0;
-    #                 self.frame = cv2.resize(self.frame,  dsize=(352,288), interpolation=cv2.INTER_LINEAR)
-    #                 LoadDisplay.pausedisplay = 1
-    #                 self.frame_num_p = 0
-    #         except:
-    #             text.insert(END, 'reading Encoded file failed')
-
-###############################
-###############################
-###############################
-
-
-
     def changevideo(self, src = ''):
+        LoadDisplay.pausedisplay = 1
         if src == '':
-            self.video_source = askopenfilename(initialdir="dataset/training_set/",
-                                                filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.")
+            self.video_source = askopenfilename(initialdir="dataset/training_set/", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.")
+            if self.video_source == '': return  # ask 창 cancel 한 경우
         else:
             self.video_source = src
 
+        if self.vid.isOpened(): self.vid.release()           # 만약 클래스에 이전 영상이 열려있다면, 소멸처리
         self.vid = cv2.VideoCapture(self.video_source)
-        #print(int(self.vid.get(5)))        ### 뭐야이거
         self.name = os.path.splitext(self.video_source)[1]
-        #self.changetext(text,text2)
-        #print(self.vid)
 
         if not self.vid.isOpened():
-            print("@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-            print("error, opening in %s" % self.video_source)
-        else:
-            ret, self.frame = self.get_frame()  # 로드시 초기 1프레임 띄우기
+            if self.video_source.is_file():
+                print("@@@@@@@@@@@@@@@@@@@@@@@@@@@")             ## 디코딩 불가
+                print("error, decoding in cv2.videocapture from %s" % self.video_source)
+                ## 에러영상 메세지 디스플레이기능 넣기
+                self.video_source = ""
+            else:
+                print("@@@@@@@@@@@@@@@@@@@@@@@@@@@")             ## 영상 노존재
+                print("error, file not exist in %s" % self.video_source)
+                ## 에러영상 메세지 디스플레이기능 넣기
+                self.video_source = ""
+
+        else:   # 정상로드되었다면 영상 정보를 얻자
+            ret, self.frame = self.get_frame()  # 동영상의 초기 1프레임 얻어 띄우기
             self.frame_count = self.vid.get(cv2.CAP_PROP_FRAME_COUNT)
             self.i_width = self.vid.get(3)
             self.i_height = self.vid.get(4)
             ratio = 352 / self.i_width
             self.zoom_x=ratio; self.zoom_y=ratio; self.move_x=0; self.move_y=0;
             self.frame = cv2.resize(self.frame, None, fx=1, fy=1, interpolation=cv2.INTER_LINEAR)
-            LoadDisplay.pausedisplay = 1
             self.frame_num_p = 0
-        window.update()
-        time.sleep(0.01)
-
+            window.update()
+            time.sleep(0.01)
+            return self.video_source
 
     def get_frame(self):
         if self.vid.isOpened():  # self.vid.set(cv2.CV_CAP_PROP_POS_FRAMES, frame_number - 1)
@@ -168,19 +118,16 @@ class LoadDisplay(object):
         else:
             return 0, 0  # 초기 init 상태
 
-
     def update(self):
         if LoadDisplay.pausedisplay == 1:
             ret = 3  # pause 기능
         else:
             ret, temframe = self.get_frame()  # Get a frame from the video source
-
         if ret == 2:  # 일반 재생 시
             self.frame = temframe
             temframe = cv2.resize(temframe, None, fx=self.zoom_x, fy=self.zoom_y, interpolation=cv2.INTER_LINEAR)
             self.photo = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(temframe))
             self.canvas.create_image(self.move_x, self.move_y, image=self.photo, anchor=tkinter.NW)
-
         if ret == 3:  # 영상의 끝일때 마지막 프레임을 재생하도록
             if self.frame is None:
                 pass
@@ -188,14 +135,11 @@ class LoadDisplay(object):
                 temframe = cv2.resize(self.frame, None, fx=self.zoom_x, fy=self.zoom_y, interpolation=cv2.INTER_LINEAR)
                 self.photo = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(temframe))
                 self.canvas.create_image(self.move_x, self.move_y, image=self.photo, anchor=tkinter.NW)
-
         window.after(self.delay, self.update)  # 반복 호출
-
 
     def l_click(self, event):
         self.lock_x = -self.move_x + event.x
         self.lock_y = -self.move_y + event.y
-
 
     def r_click(self, event):
         try:
@@ -204,11 +148,9 @@ class LoadDisplay(object):
             self.r_popup.grab_release()
         pass
 
-
     def drag(self, event):
         self.move_x = - (self.lock_x - event.x)
         self.move_y = - (self.lock_y - event.y)
-
 
     def keypress(self, event):  # canvas 에선 작동안하나봄
         kp = repr(event.char)
@@ -223,7 +165,6 @@ class LoadDisplay(object):
             else:
                 LoadDisplay.pausedisplay = 1
 
-
     def mousewheel(self, event):
         if event.delta > 0:
             self.move_x = self.move_x - (self.i_width * self.zoom_x) * 0.125 + 2.5
@@ -236,20 +177,16 @@ class LoadDisplay(object):
             self.zoom_x = self.zoom_x * 0.750000
             self.zoom_y = self.zoom_y * 0.750000
 
-
-
-
     def touch_slide(self, event):
         if self.vid.isOpened():
             self.vid.set(cv2.CAP_PROP_POS_FRAMES, LoadDisplay.progressbar)
-            # ret, frame = self.vid.read()
-            # LoadDisplay.progressbar = self.vid.get(cv2.CAP_PROP_POS_AVI_RATIO)
-        #     if ret:
-        #         return 2, cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # success
-        #     else:
-        #         return 3, None  # 시퀀스 끝 빈 프레임
-        # else:
-        #     return 0, 0  # 초기 init 상태
+
+
+
+def set_slider(slidername, *args):
+    t = 0
+    for i in args:
+        if t < i.frame_count: t = i.frame_count
 
 def print_dual(text, aa):
     now = datetime.now()
@@ -264,7 +201,6 @@ def print_dual(text, aa):
             print_dual_nocl(text, '%d, ' % (a))
         print_dual_nocl(text, ']\n')
     text.update()
-
 def print_dual_nocl(text, aa):
     print(aa, end='')
     if type(aa) == str: text.insert(END, aa)
@@ -275,15 +211,10 @@ def print_dual_nocl(text, aa):
         print_dual_nocl(text, ']\n')
     text.update()
 
-def set_slider(slidername, *args):
-    t = 0
-    for i in args:
-        if t < i.frame_count: t = i.frame_count
-
-#  slidername Scale(frame1, from_=0, to=200, orient=HORIZONTAL, length=810)
 
 
-def non_block_threding(text, src):  ### 헉헉 겨우 찾았다 stdout를 read로 읽으면 먹통되는 현상 고치는 함수
+
+def non_block_threding_popen(text, src):  ### 헉헉 겨우 찾았다 stdout를 read로 읽으면 먹통되는 현상 고치는 함수
     try:
         from Queue import Queue, Empty
     except ImportError:
@@ -311,8 +242,12 @@ def non_block_threding(text, src):  ### 헉헉 겨우 찾았다 stdout를 read�
         window.update()
         time.sleep(0.01)
 
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
 
-def scenario_act(event):                    ### 변조과정 시
+def scenario_act(event):                    ### 변조과정       각 연구실 알아서 작성 요망
     seq1 = vid1.video_source
 
     if event.widget.current() == 0:                             ## inverse (미완)
@@ -329,45 +264,55 @@ def scenario_act(event):                    ### 변조과정 시
         video = xor_fast(video, count)
 
     elif event.widget.current() == 2:
-        pass    # 시나리오별 코드s here
+        pass    # 연구실별 변조 코드s here
 
     elif event.widget.current() == 3:
-        pass    # 시나리오별 코드s here
+        pass    # 연구실별 변조 코드s here
 
     elif event.widget.current() == 4:
-        pass    # 시나리오별 코드s here
+        pass    # 연구실별 변조 코드s here
 
-    elif event.widget.current() == 5:
-        with subprocess.Popen(["ipconfig"], stdout=subprocess.PIPE, universal_newlines=True) as proc:
-            text_1_3.insert(tkinter.INSERT, proc.stdout.read())
+    elif event.widget.current() == 5:        ## 시나리오6 ipconfig출력 예시
+        non_block_threding_popen(text_1_3, "ipconfig")
 
-    elif event.widget.current() == 6:        ## 시나리오7 예시
-        seq2 = askopenfilename(initialdir="", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.")
-        with subprocess.Popen("python.exe fakeke_enc_dec.py %s %s" % (seq1, seq2), stdout=subprocess.PIPE, universal_newlines=True, encoding='utf-8') as proc:
-            text_1_3.insert(tkinter.INSERT, proc.stdout.read())
-        seq1 = os.path.splitext(seq1)[0]
-        seq2 = os.path.basename(seq2)
-        seq3 = seq1 + '_' + seq2
-        vid2.changevideo(seq3) if os.path.isfile(seq3) else print_dual(text_1_3, '%s 존재하지 않음' % seq3)
+    elif event.widget.current() == 6:        ## 시나리오7 더미-히든 시나리오 예시     현재 mpeg2,263,264,265 만 됨
+        seq2 = askopenfilename(initialdir="", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.") # 더미-히든 변조과정에 필요한 추가시퀀스(히든) 열기
+        non_block_threding_popen(text_1_3, "python.exe fakeke_enc_dec.py %s %s" % (seq1, seq2))                         # 더미-히든 시나리오 변조 실행
+        seq3 = os.path.splitext(seq1)[0] + '_' + os.path.basename(seq2)
+        vid2.changevideo(seq3) if os.path.isfile(seq3) else print_dual(text_1_3, '%s 존재하지 않음' % seq3)               # 더미-히든 실행 후 완료된 파일 vid2에 띄우기 ?.?.? 넣을까뺄까
 
 
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
 
-def scenario_inv_act():                       ### 복조과정 시
-    vid3.changevideo()
-    non_block_threding(text_2_3, "python.exe 상민딥예측.py %s" % vid3.video_source)              # 상민딥 돌린 후
+def scenario_inv_act():                       ### 복조과정      각 연구실 알아서 작성 요망
+    seq1 = vid3.changevideo()                                             # 영상 ask창으로 불러오기
+    if seq1 == '': return  # 사용자가 ask 창을 캔슬 누른 경우 아웃
 
-    print(text_2_3.get('end-2lines', END))                  #'default', 'inverse', 'xor'  에 따라서 복조과정 수행              미완성
+    non_block_threding_popen(text_2_3, "python.exe fakeke_enc_dec.py %s" % seq1)            # 더미-히든 판별모드 실행 (임시 하드코딩)
+    if text_2_3.get('end-2lines', END)[-9:-3] == 'hidden':
+        None
+    else:
+        non_block_threding_popen(text_2_3, "python.exe 상민딥예측.py %s" % seq1)              # 더미-히든 아닐경우 상민딥 돌림
+                                                                                            # MPEG2 H.263 H.264 H.265 IVC VP8 JPEG JPEG2000 BMP PNG TIFF 코덱과
+                                                                                            # 'default', 'inverse', 'xor' 시나리오에 대해 판별함
     if text_2_3.get('end-2lines', END) == 'default':
-        None
+        None            # 연구실별 복조 코드s here
     elif text_2_3.get('end-2lines', END) == 'inverse':
-        None
+        None            # 연구실별 복조 코드s here
     elif text_2_3.get('end-2lines', END) == 'xor':
-        None
-    elif text_2_3.get('end-2lines', END) == 'dummy':
-        None
+        None            # 연구실별 복조 코드s here
+    elif text_2_3.get('end-2lines', END)[-9:-3] == 'hidden':                                       # 더미-히든 시나리오라면
+        print("1. restoring hidden video")
+        non_block_threding_popen(text_2_3, "python.exe fakeke_enc_dec.py %s %s" % (seq1, '1'))     # 더미-히든 시나리오 복조모드 실행
+        vid4.changevideo(os.path.splitext(seq1)[0] + '_rev' + os.path.splitext(seq1)[1])
+        print("완료")
 
 
-
+#########################################################################################################
+#########################################################################################################
+# 이후 UI 관련 코드
 
 window = tkinter.Tk()
 window.title('UI test')

@@ -49,7 +49,7 @@ def codecdecision(seq):
     seq4 = re.split(d4, seq);      del seq4[0];        seq4 = [x + y for x, y in zip(seq4[0::2], seq4[1::2])]
 
 
-    print("mpeg2: %d, 263: %d, 264: %d hevc: %d IVC: %d" % (len(seq0), len(seq1)-len(seq1_ex), len(seq2), len(seq3)-len(seq3_ex), len(seq4)))
+    #print("mpeg2: %d, 263: %d, 264: %d hevc: %d IVC: %d" % (len(seq0), len(seq1)-len(seq1_ex), len(seq2), len(seq3)-len(seq3_ex), len(seq4)))
     cdx = [len(seq0), len(seq1)-len(seq1_ex), len(seq2), len(seq3)-len(seq3_ex), len(seq4)].index(max([len(seq0), len(seq1)-len(seq1_ex), len(seq2), len(seq3)-len(seq3_ex), len(seq4)]))
     return [seq0, seq1, seq2, seq3, seq4][cdx], cdx
 
@@ -470,9 +470,10 @@ elif goto == 3:                                                                 
             if (reversed_stream[i][2] & 0xF0) == 0x80  : ttb += 1;
 
     if (ttb / tta) > 0.4:
-        print("숨겨진 영상이 존재합니다.   (NALU: %d  ratio: %.2f)" % (tta, ttb / tta))
+        print("(NALU: %d  ratio: %.2f)" % (tta, ttb / tta), "scenario found: dummy-hidden.")
     else:
-        print("숨겨진 영상이 존재하지 않습니다.   (NALU: %d  ratio: %.2f)" % (tta, ttb / tta))
+        #print("(NALU: %d  ratio: %.2f)" % (tta, ttb / tta), "숨겨진 영상이 존재하지 않습니다.")  # 없을땐 보이지 않도록하자 (임시)
+        None
 
 
 elif goto == 4:                                                                       ####################### 오류 메세지 출력
