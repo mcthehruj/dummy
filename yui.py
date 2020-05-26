@@ -353,7 +353,7 @@ def scenario_act(event):                    ### 변조과정 시
 
 
 def scenario_inv_act():                       ### 복조과정 시
-    vid3.changevideo('dataset/training_set/akiyo_cif_akiyo_cif.264')
+    vid3.changevideo()
     non_block_threding(text_2_3, "python.exe 상민딥예측.py %s" % vid3.video_source)              # 상민딥 돌린 후
 
     print(text_2_3.get('end-2lines', END))                  #'default', 'inverse', 'xor'  에 따라서 복조과정 수행              미완성
