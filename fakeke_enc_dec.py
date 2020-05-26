@@ -33,20 +33,25 @@ from os.path import basename
 # 더미-히든 시나리오는    더미(보여질미끼영상) 와 히든(숨길목적영상)을 하나의 264 스트림으로 만들어주는 시나리오 입니다
 
 def codecdecision(seq):
-    d0 = b'(\x00\x00\x01[\xB0-\xBF])'                                       # mpeg2
+    d0 = b'(\x00\x00\x01[\xB0-\xB5])'                                       # mpeg2
     d1 = b'(\x00\x00[\x80-\x8F])'                                           # 263
     d1_ex = b'(\x80\x00\x00[\x80-\x8F])'
     d2 = b'(\x00\x00\x01[\x68|\x67|\x65|\x61|\x41|\x21|\x01])'              # 264
-    d3 = b'(\x00\x00\x01[\x40|\x41|\x42|\x43|\x44|\x4E|\x26|\x28|\x00|\x02|\x2A|\x10|\x12])'              # hevc 40, 41: VPS, 42, 43: SPS, 44: PPS, 4E: SEI, 26: IDR Frame
-    seq0 = re.split(d0, seq);      del seq0[0];     seq0 = [x + y for x, y in zip(seq0[0::2], seq0[1::2])] # 뭔지 모르는 2A, 10 12 추가함
-    seq1 = re.split(d1, seq);      del seq1[0];     seq1 = [x + y for x, y in zip(seq1[0::2], seq1[1::2])]
+    d3 = b'(\x00\x00\x01[\x40|\x41|\x42|\x43|\x44|\x4E|\x26|\x28|\x00|\x02|\x2A|\x10|\x12])'    # hevc 40, 41: VPS, 42, 43: SPS, 44: PPS, 4E: SEI, 26: IDR Frame
+    d3_ex = b'(\x00\x00\x01\x00[\x1F|\x01|\x80|\x00])'
+    d4 = b'(\x00\x00\x01\x00)'    # IVC 00
+    seq0 = re.split(d0, seq);      del seq0[0];        seq0 = [x + y for x, y in zip(seq0[0::2], seq0[1::2])] # 뭔지 모르는 2A, 10 12 추가함
+    seq1 = re.split(d1, seq);      del seq1[0];        seq1 = [x + y for x, y in zip(seq1[0::2], seq1[1::2])]
     seq1_ex = re.split(d1_ex, seq);del seq1_ex[0];     seq1_ex = [x + y for x, y in zip(seq1_ex[0::2], seq1_ex[1::2])]
-    seq2 = re.split(d2, seq);      del seq2[0];     seq2 = [x + y for x, y in zip(seq2[0::2], seq2[1::2])]
-    seq3 = re.split(d3, seq);      del seq3[0];     seq3 = [x + y for x, y in zip(seq3[0::2], seq3[1::2])]
+    seq2 = re.split(d2, seq);      del seq2[0];        seq2 = [x + y for x, y in zip(seq2[0::2], seq2[1::2])]
+    seq3 = re.split(d3, seq);      del seq3[0];        seq3 = [x + y for x, y in zip(seq3[0::2], seq3[1::2])]
+    seq3_ex = re.split(d3_ex, seq);del seq3_ex[0];     seq3_ex = [x + y for x, y in zip(seq3_ex[0::2], seq3_ex[1::2])]
+    seq4 = re.split(d4, seq);      del seq4[0];        seq4 = [x + y for x, y in zip(seq4[0::2], seq4[1::2])]
 
-    print("mpeg2: %d, 263: %d, 264: %d hevc: %d" % (len(seq0), len(seq1)-len(seq1_ex), len(seq2), len(seq3)))
-    cdx = [len(seq0), len(seq1)-len(seq1_ex), len(seq2), len(seq3)].index(max([len(seq0), len(seq1)-len(seq1_ex), len(seq2), len(seq3)]))
-    return [seq0, seq1, seq2, seq3][cdx], cdx
+
+    print("mpeg2: %d, 263: %d, 264: %d hevc: %d IVC: %d" % (len(seq0), len(seq1)-len(seq1_ex), len(seq2), len(seq3)-len(seq3_ex), len(seq4)))
+    cdx = [len(seq0), len(seq1)-len(seq1_ex), len(seq2), len(seq3)-len(seq3_ex), len(seq4)].index(max([len(seq0), len(seq1)-len(seq1_ex), len(seq2), len(seq3)-len(seq3_ex), len(seq4)]))
+    return [seq0, seq1, seq2, seq3, seq4][cdx], cdx
 
 if (len(sys.argv) == 1):   #### goto 1:변조모드로    2:복조모드로    3:변조여부판단모드로    4:인자오류메세지출력으로
     goto = 4
@@ -80,7 +85,23 @@ if goto == 1:                                                                   
     elif(cdx == 1): ext = '.h263'
     elif(cdx == 2): ext = '.264'
     elif(cdx == 3): ext = '.hevc'
+    elif(cdx == 4): ext = '.bit'    #IVC
 
+
+    if cdx == 4:
+        # IVC
+        # PPS: x00
+        PPScnt = 0
+        for i in range(len(stream_d)):   # 더미의 0x68 pps 개수 파악
+            if stream_d[i][3] == 0x00:
+                PPScnt += 1
+
+        for i in range(len(stream_h)):                          # 히든의 pps 뒤에 사용자 종료코드 넣음.. 복조시나리오때 활용
+            if stream_h[i][3] == 0x00:
+                stream_h[i] = stream_h[i] + b'\x55\x56\x57'
+
+        print("dum NALU: ",len(stream_d),"PPS:",PPScnt)
+        print("hid NALU: ",len(stream_h))
 
     if cdx == 3:
         # HEVC
@@ -190,6 +211,11 @@ if goto == 1:                                                                   
     bb = len(vh); n = 0
     if flag == 1: # 더미 길이에 맞춤
         for i in range(itermax):
+            if (cdx == 4):
+                if vd[i % aa][3] == 0xB0 or vd[i % aa][3] == 0xB1 or vd[i % aa][3] == 0xB2 or vd[i % aa][3] == 0xB3 or vd[i % aa][3] == 0xB6:
+                    dummy_mixed = dummy_mixed + vd[i%aa];                           n+=1
+                else:
+                    dummy_mixed = dummy_mixed + vd[i%aa] + vh[(i-n)%bb][::-1]
             if (cdx == 3):
                 if vd[i % aa][3] == 0x40 or vd[i % aa][3] == 0x41 or vd[i % aa][3] == 0x42 or vd[i % aa][3] == 0x43 or vd[i % aa][3] == 0x44 or vd[i % aa][3] == 0x4E:
                     dummy_mixed = dummy_mixed + vd[i%aa];                           n+=1
@@ -210,6 +236,11 @@ if goto == 1:                                                                   
     elif flag == 2: # 히든 길이에 맞춤
         i = 0
         while i < itermax+n: # +n의 차이만 있다.
+            if (cdx == 4):
+                if vd[i % aa][3] == 0xB0 or vd[i % aa][3] == 0xB1 or vd[i % aa][3] == 0xB2 or vd[i % aa][3] == 0xB3 or vd[i % aa][3] == 0xB6:
+                    dummy_mixed = dummy_mixed + vd[i%aa];                          i+=1; n+=1
+                else:
+                    dummy_mixed = dummy_mixed + vd[i%aa] + vh[(i-n)%bb][::-1];     i+=1
             if (cdx == 3):
                 if vd[i % aa][3] == 0x40 or vd[i % aa][3] == 0x41 or vd[i % aa][3] == 0x42 or vd[i % aa][3] == 0x43 or vd[i % aa][3] == 0x44 or vd[i % aa][3] == 0x4E:
                     dummy_mixed = dummy_mixed + vd[i%aa];                          i+=1; n+=1
@@ -244,6 +275,14 @@ elif goto == 2:                                                                 
 
     print(" NALU: ", len(stream))
 
+    if (cdx == 4):
+        i = 0
+        while i < len(stream):
+            if stream[i][3] == 0xB0 or stream[i][3] == 0xB1 or stream[i][3] == 0xB2 or stream[i][3] == 0xB3 or stream[i][3] == 0xB6:  # 더미의 sps, pps, sei nalu 에는 히든의 데이터를 넣지 않았으므로 삭제처리
+                del stream[i]; i-=1
+            else:
+                i += 1
+
     # VPS: x40, x41
     # SPS: x42, x43
     # PPS: x44
@@ -271,6 +310,24 @@ elif goto == 2:                                                                 
                 del stream[i]; i-=1
             else:
                 i += 1
+
+
+    if (cdx == 4):
+        ## 뒤집힌 더미에서 발생하는 스타트코드 삭제처리
+        for i in range(len(stream)):
+            stream[i] = re.split(b'\x00\x00\x01', stream[i][-4::-1])[0][-4::-1] + stream[i][-3:]
+       #     stream[i] = re.split(b'\x00\x00\x02', stream[i][-4::-1])[0][-4::-1] + stream[i][-3:]
+       #     stream[i] = re.split(b'\x00\x00\x03', stream[i][-4::-1])[0][-4::-1] + stream[i][-3:]
+        ## 정히든의 에뮬레이션 방지 처리 되돌리기 000001 000002 000003
+        for i in range(len(stream)):
+            stream[i] = re.sub(b'\xE3\x00\xD0\x01\xC5', b'\x00\x00\x01', stream[i][::-1])[::-1]
+            stream[i] = re.sub(b'\xE3\x00\xD0\x02\xC5', b'\x00\x00\x02', stream[i][::-1])[::-1]
+            stream[i] = re.sub(b'\xE3\x00\xD0\x03\xC5', b'\x00\x00\x03', stream[i][::-1])[::-1]
+        ## 역히든의 에뮬레이션 방지 처리 되돌리기 000001 000002 000003
+        for i in range(len(stream)):
+            stream[i] = re.sub(b'\xE3\x00\xD0\x01\xC5', b'\x00\x00\x01', stream[i])
+            stream[i] = re.sub(b'\xE3\x00\xD0\x02\xC5', b'\x00\x00\x02', stream[i])
+            stream[i] = re.sub(b'\xE3\x00\xD0\x03\xC5', b'\x00\x00\x03', stream[i])
 
     if (cdx == 3):
         ## 뒤집힌 더미에서 발생하는 스타트코드 삭제처리
@@ -319,6 +376,10 @@ elif goto == 2:                                                                 
     # SEI: x4E
     # IDR Frame: x26
 
+    if (cdx == 4):
+        for i in range(len(stream)):
+            if stream[i][::-1][3] == 0x00:  # 히든의 pps는 단독으로 써야하니 종료코드 확인해서 자른다
+                stream[i] = re.split(b'\x55\x56\x57', stream[i][::-1])[0][::-1]
     if (cdx == 3):
         for i in range(len(stream)):
             if stream[i][::-1][3] == 0x40 or stream[i][::-1][3] == 0x41 or stream[i][::-1][3] == 0x42 or stream[i][::-1][3] == 0x43 or stream[i][::-1][3] == 0x44 or stream[i][::-1][3] == 0x4E:  # 히든의 pps는 단독으로 써야하니 종료코드 확인해서 자른다
@@ -335,6 +396,7 @@ elif goto == 2:                                                                 
     reversed_stream = b''
     for i in range(len(stream)):
         reversed_stream = reversed_stream + stream[i][::-1]
+    if (cdx == 4): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_rev.bit', 'wb'); src = "ffmpeg.exe -i "          + os.path.splitext(sys.argv[1])[0] + "_rev.bit "              + os.path.splitext(sys.argv[1])[0] + "_rev.yuv"
     if (cdx == 3): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_rev.hevc', 'wb'); src = "ffmpeg.exe -i "          + os.path.splitext(sys.argv[1])[0] + "_rev.hevc "              + os.path.splitext(sys.argv[1])[0] + "_rev.yuv"
     if (cdx == 2): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_rev.264', 'wb'); src = "ldecod.exe -p InputFile=" + os.path.splitext(sys.argv[1])[0] + "_rev.264 -p OutputFile=" + os.path.splitext(sys.argv[1])[0] + "_rev.yuv"
     if (cdx == 0): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_rev.m2v', 'wb'); src = "ffmpeg.exe -i "           + os.path.splitext(sys.argv[1])[0] + "_rev.m2v "               + os.path.splitext(sys.argv[1])[0] + "_rev.yuv"
