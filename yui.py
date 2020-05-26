@@ -83,11 +83,8 @@ class LoadDisplay(object):  #ui 영상창 클래스
         self.name = os.path.splitext(self.video_source)[1]
 
         if not self.vid.isOpened():
-            if self.video_source.is_file():
-                print("@@@@@@@@@@@@@@@@@@@@@@@@@@@")             ## 디코딩 불가
-                print("error, decoding in cv2.videocapture from %s" % self.video_source)
-                ## 에러영상 메세지 디스플레이기능 넣기
-                self.video_source = ""
+            if os.path.isfile(self.video_source):
+                None        ## 경로만 존재해도 vid는 열린걸로 인식하는듯
             else:
                 print("@@@@@@@@@@@@@@@@@@@@@@@@@@@")             ## 영상 노존재
                 print("error, file not exist in %s" % self.video_source)
@@ -96,7 +93,15 @@ class LoadDisplay(object):  #ui 영상창 클래스
 
         else:   # 정상로드되었다면 영상 정보를 얻자
             ret, self.frame = self.get_frame()  # 동영상의 초기 1프레임 얻어 띄우기
-            self.frame_count = self.vid.get(cv2.CAP_PROP_FRAME_COUNT)
+            if self.frame is None:             ## 파일은 존재하지만 디코딩이 안됐단뜻    ## IVC 디코더로 시도
+                self.vid.release();    print("IVC 디코더로 시도")
+                subprocess.Popen("ldecod_ivc.exe %s 1t_youcandelete_%s" % (self.video_source, os.path.basename(self.video_source)))     # 현재폴더에 재인코딩된 임시파일 생성
+                self.video_source = '1t_youcandelete_' + os.path.basename(self.video_source)
+                subprocess.Popen("ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i %s -c:v libx264 -y %s.264" % (self.video_source, os.path.splitext(self.video_source)[0]))
+                self.vid = cv2.VideoCapture(os.path.splitext(self.video_source)[0] + '.264')
+                ret, self.frame = self.get_frame()
+                ## 그래도 안뜬다면 시퀀스는 에러영상 일것임     화면상에 에러 메세지로 디스플레이기능 넣기
+            self.frame_count = self.vid.get(cv2.CAP_PROP_FRAME_COUNT)                   ##### 정리좀 할것
             self.i_width = self.vid.get(3)
             self.i_height = self.vid.get(4)
             ratio = 352 / self.i_width
@@ -109,7 +114,8 @@ class LoadDisplay(object):  #ui 영상창 클래스
 
     def get_frame(self):
         if self.vid.isOpened():  # self.vid.set(cv2.CV_CAP_PROP_POS_FRAMES, frame_number - 1)
-            ret, frame = self.vid.read()
+            try: ret, frame = self.vid.read()           # cv가 코덱모를경우 에러뿜음
+            except: None
             LoadDisplay.progressbar = self.vid.get(cv2.CAP_PROP_POS_FRAMES)
             if ret:
                 return 2, cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # success
@@ -211,36 +217,33 @@ def print_dual_nocl(text, aa):
         print_dual_nocl(text, ']\n')
     text.update()
 
-
-
-
-def non_block_threding_popen(text, src):  ### 헉헉 겨우 찾았다 stdout를 read로 읽으면 먹통되는 현상 고치는 함수
-    try:
-        from Queue import Queue, Empty
-    except ImportError:
-        from queue import Queue, Empty  # python 3.x
-    ON_POSIX = 'posix' in sys.builtin_module_names
-
+def non_block_threding_popen(text, src, encoding='utf-8'):  ### 헉헉 겨우 찾았다 stdout를 read로 읽으면 먹통되는 현상 고치는 함수
+    from queue import Queue
     def enqueue_output(out, queue):
-        for line in iter(out.readline, b''):
-            queue.put(line)
-        out.close()
+        try:
+            for line in iter(out.readline, b''):
+                queue.put(line)
+        except:
+            return                      # print("탈출");                            # 개거지같은 파이썬
 
-    p = subprocess.Popen(src, encoding='utf-8', stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1, close_fds=ON_POSIX)
+    p = subprocess.Popen(src, encoding=encoding, stdout=subprocess.PIPE)
     q = Queue()
     t = threading.Thread(target=enqueue_output, args=(p.stdout, q))
-    t.daemon = True  # thread dies with the program
+    t.daemon = True
     t.start()
 
+    tt = 0
     while p.poll() is None:  # read line without blocking
+        tt += 1
         try:
             line = q.get_nowait()  # or q.get(timeout=.1)
-        except Empty:
-            None  # print('no output yet')
+        except:
+            if tt == 100: window.update(); time.sleep(0.0001); tt = 0  # print('no output yet')
         else:  # got line
             text.insert(END, line)
-        window.update()
-        time.sleep(0.01)
+    time.sleep(0.01)
+    p.stdout.close()                         # 개거지같은 파이썬
+
 
 #########################################################################################################
 #########################################################################################################
@@ -273,7 +276,9 @@ def scenario_act(event):                    ### 변조과정       각 연구실
         pass    # 연구실별 변조 코드s here
 
     elif event.widget.current() == 5:        ## 시나리오6 ipconfig출력 예시
-        non_block_threding_popen(text_1_3, "ipconfig")
+        non_block_threding_popen(text_1_3, ["ipconfig"], encoding='cp949')
+        # with subprocess.Popen(["ipconfig"], stdout=subprocess.PIPE, encoding='cp949') as proc:
+        #     text_1_3.insert(tkinter.INSERT, proc.stdout.read())
 
     elif event.widget.current() == 6:        ## 시나리오7 더미-히든 시나리오 예시     현재 mpeg2,263,264,265 만 됨
         seq2 = askopenfilename(initialdir="", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.") # 더미-히든 변조과정에 필요한 추가시퀀스(히든) 열기

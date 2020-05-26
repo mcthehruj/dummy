@@ -264,7 +264,7 @@ if goto == 1:                                                                   
     v_dum.close()
     v_hid.close()
     out.close()
-
+    print("변조 완료")
 
 elif goto == 2:                                                                       ####################### 복조 모드
     print("복호 모드 진행 중")
