@@ -96,9 +96,9 @@ class LoadDisplay(object):  #ui 영상창 클래스
             if self.frame is None:             ## 파일은 존재하지만 디코딩이 안됐단뜻    ## IVC 디코더로 시도
                 self.vid.release();    print("IVC 디코더로 시도")
                 subprocess.run("ldecod_ivc.exe %s 1t_youcandelete_%s" % (self.video_source, os.path.basename(self.video_source)))     # 현재폴더에 재인코딩된 임시파일 생성
-                self.video_source = '1t_youcandelete_' + os.path.basename(self.video_source)
-                subprocess.run("ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i %s -c:v hevc -y %s.hevc" % (self.video_source, os.path.splitext(self.video_source)[0]))
-                self.vid = cv2.VideoCapture(os.path.splitext(self.video_source)[0] + '.hevc')
+                yuv_src = '1t_youcandelete_' + os.path.basename(self.video_source)
+                subprocess.run("ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i %s -c:v hevc -y %s.hevc" % (yuv_src, os.path.splitext(yuv_src)[0]))
+                self.vid = cv2.VideoCapture(os.path.splitext(yuv_src)[0] + '.hevc')
                 ret, self.frame = self.get_frame()
                 ## 그래도 안뜬다면 시퀀스는 에러영상 일것임     화면상에 에러 메세지로 디스플레이기능 넣기
             self.frame_count = self.vid.get(cv2.CAP_PROP_FRAME_COUNT)                   ##### 정리좀 할것
@@ -414,19 +414,19 @@ slider_2.pack()
 
 
 # button click event set
-# btn_1 = tkinter.Button(window, text='load file & encode', command=lambda: vid1.changevideo(), compound=LEFT)
+# btn_1 = tkinter.Button(window, text='input sequence & encode', command=lambda: vid1.changevideo(), compound=LEFT)
 # btn_2 = tkinter.Button(window, text='distortion', command=lambda: vid2.changevideo(), compound=LEFT)
 # btn_3 = tkinter.Button(window, text='load model & classify', command=lambda: vid3.changevideo(), compound=LEFT)
 # btn_4 = tkinter.Button(window, text='recover', command=lambda: vid4.changevideo(), compound=LEFT)
 
 #text_1_1 = Text(frame1,width = 10,height=1 )
-btn_1_1 = tkinter.Button(frame1, text="load file", command=lambda: vid1.changevideo())
+btn_1_1 = tkinter.Button(frame1, text="input stream", command=lambda: vid1.changevideo())
 #btn_1_2 = tkinter.Button(frame1, text="Encode", command=lambda: vid2.detect(text_1_3, combo_1_2.current()+1, codec_list.index(os.path.splitext(vid1.video_source)[1]), os.path.splitext(vid1.video_source)[0]))
 # vid2.detect(text_1_3)
 # vid2.detect(text_1_3, combo_1_2.current()+1, codec_list.index(os.path.splitext(vid1.video_source)[1]), os.path.splitext(vid1.video_source)[0])
 #detect.main(combo_1_2.current(),3,vid1.video_source)
 #text_2_1 = Text(frame2,width = 10,height=1 )
-btn_2_1 = tkinter.Button(frame2, text="load file", command=lambda: scenario_inv_act())
+btn_2_1 = tkinter.Button(frame2, text="restore stream", command=lambda: scenario_inv_act())
 #btn_2_2 = tkinter.Button(frame2, text="Decode", command=lambda: vid4.detect_inv(text_2_3, os.path.splitext(vid3.video_source)))
 
 
