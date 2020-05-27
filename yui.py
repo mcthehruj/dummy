@@ -95,10 +95,10 @@ class LoadDisplay(object):  #ui 영상창 클래스
             ret, self.frame = self.get_frame()  # 동영상의 초기 1프레임 얻어 띄우기
             if self.frame is None:             ## 파일은 존재하지만 디코딩이 안됐단뜻    ## IVC 디코더로 시도
                 self.vid.release();    print("IVC 디코더로 시도")
-                subprocess.Popen("ldecod_ivc.exe %s 1t_youcandelete_%s" % (self.video_source, os.path.basename(self.video_source)))     # 현재폴더에 재인코딩된 임시파일 생성
+                subprocess.run("ldecod_ivc.exe %s 1t_youcandelete_%s" % (self.video_source, os.path.basename(self.video_source)))     # 현재폴더에 재인코딩된 임시파일 생성
                 self.video_source = '1t_youcandelete_' + os.path.basename(self.video_source)
-                subprocess.Popen("ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i %s -c:v libx264 -y %s.264" % (self.video_source, os.path.splitext(self.video_source)[0]))
-                self.vid = cv2.VideoCapture(os.path.splitext(self.video_source)[0] + '.264')
+                subprocess.run("ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i %s -c:v hevc -y %s.hevc" % (self.video_source, os.path.splitext(self.video_source)[0]))
+                self.vid = cv2.VideoCapture(os.path.splitext(self.video_source)[0] + '.hevc')
                 ret, self.frame = self.get_frame()
                 ## 그래도 안뜬다면 시퀀스는 에러영상 일것임     화면상에 에러 메세지로 디스플레이기능 넣기
             self.frame_count = self.vid.get(cv2.CAP_PROP_FRAME_COUNT)                   ##### 정리좀 할것
@@ -232,15 +232,14 @@ def non_block_threding_popen(text, src, encoding='utf-8'):  ### 헉헉 겨우 �
     t.daemon = True
     t.start()
 
-    tt = 0
     while p.poll() is None:  # read line without blocking
-        tt += 1
         try:
-            line = q.get_nowait()  # or q.get(timeout=.1)
+            line = q.get(timeout=.2)  # or q.get(timeout=.1)
         except:
-            if tt == 100: window.update(); time.sleep(0.0001); tt = 0  # print('no output yet')
+            window.update();   # print('no output yet')
         else:  # got line
             text.insert(END, line)
+            continue
     time.sleep(0.01)
     p.stdout.close()                         # 개거지같은 파이썬
 
