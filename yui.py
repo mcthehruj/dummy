@@ -1,4 +1,4 @@
-import os
+import os, glob
 import threading
 import tkinter.messagebox
 from tkinter.filedialog import askopenfilename
@@ -82,7 +82,7 @@ class LoadDisplay(object):  #ui 영상창 클래스
         self.vid = cv2.VideoCapture(self.video_source)
         self.name = os.path.splitext(self.video_source)[1]
 
-        if not self.vid.isOpened():
+        if not self.vid.isOpened(): # 열리지 않았다면
             if os.path.isfile(self.video_source):
                 None        ## 경로만 존재해도 vid는 열린걸로 인식하는듯
             else:
@@ -91,17 +91,22 @@ class LoadDisplay(object):  #ui 영상창 클래스
                 ## 에러영상 메세지 디스플레이기능 넣기
                 self.video_source = ""
 
-        else:   # 정상로드되었다면 영상 정보를 얻자
+        else:   # vid.isOpened 영상 정보를 얻자
             ret, self.frame = self.get_frame()  # 동영상의 초기 1프레임 얻어 띄우기
             if self.frame is None:             ## 파일은 존재하지만 디코딩이 안됐단뜻    ## IVC 디코더로 시도
                 self.vid.release();    print("IVC 디코더로 시도")
                 subprocess.run("ldecod_ivc.exe %s 1t_youcandelete_%s" % (self.video_source, os.path.basename(self.video_source)))     # 현재폴더에 재인코딩된 임시파일 생성
                 yuv_src = '1t_youcandelete_' + os.path.basename(self.video_source)
                 subprocess.run("ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i %s -c:v hevc -y %s.hevc" % (yuv_src, os.path.splitext(yuv_src)[0]))
-                self.vid = cv2.VideoCapture(os.path.splitext(yuv_src)[0] + '.hevc')
+                #if os.path.isfile(os.path.splitext(yuv_src)[0] + '.hevc'): 파일이존재하지않을이유는없을걸
+                if os.path.getsize(os.path.splitext(yuv_src)[0] + '.hevc') > 1:
+                    self.vid = cv2.VideoCapture(os.path.splitext(yuv_src)[0] + '.hevc')
+                else:
+                    self.vid = cv2.VideoCapture('errd1.png') ; print('오류디스플레이 출력') ## ivc디코더로도 안뜬다면 시퀀스는 에러영상 일것임     화면상에 에러 메세지로 디스플레이기능 넣기
                 ret, self.frame = self.get_frame()
-                ## 그래도 안뜬다면 시퀀스는 에러영상 일것임     화면상에 에러 메세지로 디스플레이기능 넣기
             self.frame_count = self.vid.get(cv2.CAP_PROP_FRAME_COUNT)                   ##### 정리좀 할것
+            if self.frame_count < 1 or self.frame_count > 30000:  #음수거나 너무크면
+                self.frame_count = 300 ; self.vid.set(7,300); print('프레임카운트 헤더에 오류가 있음', self.frame_count, '으로 변경')
             self.i_width = self.vid.get(3)
             self.i_height = self.vid.get(4)
             ratio = 352 / self.i_width
@@ -110,6 +115,8 @@ class LoadDisplay(object):  #ui 영상창 클래스
             self.frame_num_p = 0
             window.update()
             time.sleep(0.01)
+            sli1.set(0)
+            sli2.set(0)
             return self.video_source
 
     def get_frame(self):
@@ -120,6 +127,8 @@ class LoadDisplay(object):  #ui 영상창 클래스
             if ret:
                 return 2, cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # success
             else:
+                self.vid = cv2.VideoCapture(self.video_source)          # opencv 이상한게 프레임 재생 할당량만 채우면 종료되버리네 ㄷ  bit은 오류날듯
+                LoadDisplay.pausedisplay = 1
                 return 3, None  # 시퀀스 끝 빈 프레임
         else:
             return 0, 0  # 초기 init 상태
@@ -129,6 +138,14 @@ class LoadDisplay(object):  #ui 영상창 클래스
             ret = 3  # pause 기능
         else:
             ret, temframe = self.get_frame()  # Get a frame from the video source
+            cur = self.vid.get(1)
+            if self.frame_count < cur: self.frame_count = cur
+            if self.canvas.master.master.winfo_name() == '!frame' and self.canvas.master.winfo_name() == '!labelframe':
+                sli1.set((cur / self.frame_count) * 100)
+            if self.canvas.master.master.winfo_name() == '!frame2' and self.canvas.master.winfo_name() == '!labelframe':
+                sli2.set((cur / self.frame_count) * 100)
+
+
         if ret == 2:  # 일반 재생 시
             self.frame = temframe
             temframe = cv2.resize(temframe, None, fx=self.zoom_x, fy=self.zoom_y, interpolation=cv2.INTER_LINEAR)
@@ -251,38 +268,34 @@ def non_block_threding_popen(text, src, encoding='utf-8'):  ### 헉헉 겨우 �
 
 def scenario_act(event):                    ### 변조과정 ###      각 연구실 작성 요망
     seq1 = vid1.video_source
-    src_plus_name = os.path.splitext(seq1)[0]
-    ext           = os.path.splitext(seq1)[1]
-    name          = os.path.basename(src_plus_name)
+    src_plus_name = os.path.splitext(seq1)[0]           # 파일경로+파일이름
+    ext           = os.path.splitext(seq1)[1]           # 확장자
+    name          = os.path.basename(src_plus_name)     # 파일이름
 
-    if event.widget.current() == 0:                              ## 시나리오1 inverse
-        print('inverse 변조 중입니다..')
-        bitstream = bitstring.ConstBitStream(filename=seq1)
-        bitstream = bitstream.read(bitstream.length).bin
-        bitstream = encode(bitstream, 'inv')
-        bitstream = bitstring.BitStream('0b' + bitstream)
-        bitstream.tofile(open(src_plus_name + '_inv' + ext, 'wb'))  # 경로/seq.확장자 -> 경로/seq_inv.확장자
-        print('변조가 완료되었습니다.')
+    if event.widget.current() == 0:                              ## 시나리오1 inverse 변조
+        print_dual(text_1_3, 'inverse 변조 중입니다..')
+        bits_inv = bitstring.BitStream(~bitstring.Bits(filename=seq1))
+        bits_inv.tofile(open(src_plus_name + '_inv' + ext, 'wb'))   # 경로/seq.확장자 -> 경로/seq_inv.확장자
+        print_dual(text_1_3, '변조가 완료되었습니다.'); return
 
-    elif event.widget.current() == 1:                             ## 시나리오2 xor
-        print('xor 변조 중입니다..')
+    elif event.widget.current() == 1:                             ## 시나리오2 xor 변조
+        print_dual(text_1_3, 'xor 변조 중입니다..')
         bitstream = bitstring.ConstBitStream(filename=seq1)
-        # video.tofile(open('original' + ext, 'wb'))
-        bitstream = bitstream.read(bitstream.length).bin
-        count = factor(len(bitstream))
-        bitstream = xor_fast(bitstream, count)
-        bitstream = bitstring.BitStream('0b' + bitstream)
+        decstream = bitstream.read(bitstream.length).bin
+        count = factor(len(decstream))
+        decstream = xor_fast(decstream, count)
+        bitstream = bitstring.BitStream('0b' + decstream)
         bitstream.tofile(open(src_plus_name + '_xor' + ext, 'wb'))  # 경로/seq.확장자 -> 경로/seq_xor.확장자
-        print('변조가 완료되었습니다.')
+        print_dual(text_1_3, '변조가 완료되었습니다.'); return
 
-    elif event.widget.current() == 2:                             ## 시나리오3 더미-히든 시나리오 예시     현재 mpeg2,263,264,265,IVC 만 됨
-        print('숨길 영상을 선택 해 주세요')
+    elif event.widget.current() == 2:                             ## 시나리오3 더미-히든 변조               현재 mpeg2,263,264,265,IVC 만 지원 됨
+        print_dual(text_1_3, '숨길 영상을 추가로 선택 해 주세요')
         seq2 = askopenfilename(initialdir="", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.") # 더미-히든 변조과정에 필요한 추가시퀀스(히든) 열기
-        print('더미-히든 변조 중입니다..')
+        print_dual(text_1_3, '더미-히든 변조 중입니다..')
         non_block_threding_popen(text_1_3, "python.exe fakeke_enc_dec.py %s %s" % (seq1, seq2))                         # 더미-히든 시나리오 변조 실행
         seq3 = os.path.splitext(seq1)[0] + '_' + os.path.basename(seq2)
         vid2.changevideo(seq3) if os.path.isfile(seq3) else print_dual(text_1_3, '%s 존재하지 않음' % seq3)               # 더미-히든 실행 후 완료된 파일 vid2에 띄우기 ?.?.? 넣을까뺄까
-        print('변조가 완료되었습니다.')
+        print_dual(text_1_3, '변조가 완료되었습니다.'); return
 
     elif event.widget.current() == 3:                             ## 시나리오4 장의선교수님연구실시나리오1
         None    # 연구실별 변조 코드s here
@@ -313,51 +326,105 @@ def scenario_act(event):                    ### 변조과정 ###      각 연구
 # 1. 어떤 시나리오가 적용되어있는지 판단
 # 2. 판단된 시나리오로 각 연구실의 복조과정 실행
 def scenario_inv_act():                       ### 복조과정   시나리오별로 각 연구실에서 작성한 win32어플리케이션을 인자전달해서 복조 하도록 해주세요
-    seq1 = vid3.changevideo()      # 영상 ask창으로 불러오기
-    if seq1 == '': return  # 사용자가 ask 창을 캔슬 누른 경우 아웃
+    seq1 = vid3.changevideo();  # 영상 ask창으로 불러오기
+    if seq1 == '': return       # 사용자가 ask 창을 캔슬 누른 경우 아웃
+    src_plus_name = os.path.splitext(seq1)[0]           # 파일경로+파일이름
+    ext           = os.path.splitext(seq1)[1]           # 확장자
+    name          = os.path.basename(src_plus_name)     # 파일이름
 
     ####################################### 1.  판단 과정
-    print('1. 시나리오 적용여부 판단 중입니다..')
+    print_dual(text_2_3, '1. 시나리오 적용여부 판단 중입니다..')
 
     non_block_threding_popen(text_2_3, "python.exe fakeke_enc_dec.py %s" % seq1)            # 1.1 더미-히든 판별모드 실행 (임시 하드코딩)
     if text_2_3.get('end-2lines', END)[-9:-3] == 'hidden': None                             # 더미-히든시나리오로 판단됐다면 상민딥 안돌리고 통과
     else: non_block_threding_popen(text_2_3, "python.exe 상민딥예측.py %s" % seq1)            # 1.2 더미-히든 아닐경우 상민딥 돌림
                                                                                             #     MPEG2 H.263 H.264 H.265 IVC VP8 JPEG JPEG2000 BMP PNG TIFF 코덱과
                                                                                             #     'default', 'inverse', 'xor' 시나리오에 대해 판별함
+    catched_last1_line = text_2_3.get('end-2lines', END)
+    ####################################### 2.  복조 과정                                    # 복조과정      각 연구실별 작성 요망
+    print_dual(text_2_3, '2. 시나리오 복조를 시작합니다.')
+    if catched_last1_line[-9:-2] == 'default':                #시나리오 적용 안된 경우
+        print_dual(text_2_3, '변조된 내역이 없습니다.'); return
 
-    ####################################### 2.  복조 과정
-    print('2. 복조 과정을 수행 합니다..')                                                       # 복조과정      각 연구실별 작성 요망
-    if text_2_3.get('end-2lines', END)[-10:-3] == 'default':                #시나리오 x
-        print('변조된 내역이 없습니다.'); return
-    elif text_2_3.get('end-2lines', END)[-10:-3] == 'inverse':              #시나리오 1
-        None            # 연구실별 복조 코드s here
-    elif text_2_3.get('end-2lines', END)[-6:-3] == 'xor':                   #시나리오 2
-        None            # 연구실별 복조 코드s here
-    elif text_2_3.get('end-2lines', END)[-9:-3] == 'hidden':                #시나리오 3          # 더미-히든 시나리오라면
-        print("dummy-hidden restore start")
-        non_block_threding_popen(text_2_3, "python.exe fakeke_enc_dec.py %s %s" % (seq1, '1'))  # 더미-히든 시나리오 복조모드 실행
-        vid4.changevideo(os.path.splitext(seq1)[0] + '_rev' + os.path.splitext(seq1)[1])        # 복조된 _rev 파일 생성
+    elif catched_last1_line[-9:-2] == 'inverse':              #시나리오 1 inverse 복조
+        print_dual(text_2_3, 'inverse 복조 중입니다..')
+        bits_inv = bitstring.BitStream(~bitstring.Bits(filename=seq1))
+        bits_inv.tofile(open(src_plus_name + '_rev' + ext, 'wb'))
+        vid4.changevideo(src_plus_name + '_rev' + ext)
+        print_dual(text_2_3, '복조가 완료되었습니다.'); return
 
-    elif text_2_3.get('end-2lines', END)[-6:-3] == '장의선교수님연구실시나리오1':#시나리오 4
-        None            # 연구실별 복조 코드s here
-    elif text_2_3.get('end-2lines', END)[-6:-3] == '장의선교수님연구실시나리오2':#시나리오 5
-        None            # 연구실별 복조 코드s here
-    elif text_2_3.get('end-2lines', END)[-6:-3] == '장의선교수님연구실시나리오3':#시나리오 6
-        None            # 연구실별 복조 코드s here
-    elif text_2_3.get('end-2lines', END)[-6:-3] == '김창수교수님연구실시나리오1':#시나리오 7
-        None            # 연구실별 복조 코드s here
-    elif text_2_3.get('end-2lines', END)[-6:-3] == '김창수교수님연구실시나리오2':#시나리오 8
-        None            # 연구실별 복조 코드s here
-    elif text_2_3.get('end-2lines', END)[-6:-3] == '김창수교수님연구실시나리오3':#시나리오 9
+    elif catched_last1_line[-5:-2] == 'xor':                   #시나리오 2 xor 복조
+        print_dual(text_2_3, 'xor 복조 중입니다..')
+        bitstream = bitstring.ConstBitStream(filename=seq1)
+        decstream = bitstream.read(bitstream.length).bin
+        count = factor(len(decstream))
+        decstream = dxor_fast(decstream, count)
+        bitstream = bitstring.BitStream('0b' + decstream)
+        bitstream.tofile(open(src_plus_name + '_rev' + ext, 'wb'))
+        vid4.changevideo(src_plus_name + '_rev' + ext)
+        print_dual(text_2_3, '복조가 완료되었습니다.'); return
+
+    elif catched_last1_line[-15:-2] == 'dummy-hidden.':         #시나리오 3     # 더미-히든 복조
+        print_dual(text_2_3, "dummy-hidden restore start")
+        non_block_threding_popen(text_2_3, "python.exe fakeke_enc_dec.py %s %s" % (seq1, '1'))    # 더미-히든 시나리오 복조모드 실행
+        vid4.changevideo(src_plus_name + '_rev' + ext)          # 복조된 _rev 파일 디스플레이
+        print_dual(text_2_3, "dummy-hidden restore complete") ; return
+
+    elif catched_last1_line[-6:-2] == '장의선교수님연구실시나리오1':#시나리오 4
         None            # 연구실별 복조 코드s here
 
+    elif catched_last1_line[-6:-2] == '장의선교수님연구실시나리오2':#시나리오 5
+        None            # 연구실별 복조 코드s here
 
-    print("복조 완료")
+    elif catched_last1_line[-6:-2] == '장의선교수님연구실시나리오3':#시나리오 6
+        None            # 연구실별 복조 코드s here
+
+    elif catched_last1_line[-6:-2] == '김창수교수님연구실시나리오1':#시나리오 7
+        None            # 연구실별 복조 코드s here
+
+    elif catched_last1_line[-6:-2] == '김창수교수님연구실시나리오2':#시나리오 8
+        None            # 연구실별 복조 코드s here
+
+    elif catched_last1_line[-6:-2] == '김창수교수님연구실시나리오3':#시나리오 9
+        None            # 연구실별 복조 코드s here
+
+    else:
+        print(catched_last1_line[:-2], "<- 이 메세지 인식불가 복조 시나리오로 넘어가지 못했습니다")  ##
+
+
 
 # 여기까지 복조과정
 #########################################################################################################
 #########################################################################################################
 # 이후 UI 관련 코드
+def release(event):
+    def ddd(vid,slider):
+        current = int(vid.vid.get(1))
+        goingto = int(vid.frame_count * slider.get() / 100) + 1
+
+        if current < goingto:
+            nn = goingto - current -1
+            for n in range(1, nn):
+                vid.get_frame()
+            tt, vid.frame = vid.get_frame(); print(current, '    ',goingto)
+        elif current > goingto:
+            print(current, '    ', goingto)
+            vid.vid.set(1, goingto)
+            current = int(vid.vid.get(1))
+            nn = goingto - current -1
+            for n in range(1, nn):
+                vid.get_frame()
+            tt, vid.frame = vid.get_frame();print('    ',current, '    ', goingto)
+        time.sleep(0.81)
+
+    if event.widget.master.winfo_name() == '!frame': ddd(vid1,sli1)
+    elif event.widget.master.winfo_name() == '!frame2': ddd(vid3,sli2)
+
+def sliderdrag(event):
+    # time.sleep(0.02)
+    # release(event)
+    None
+
 
 window = tkinter.Tk()
 window.title('UI test')
@@ -397,7 +464,9 @@ text_1_3.pack()
 # Configure the scrollbars
 yscrollbar.config(command=text_1_3.yview)
 
-slider_1 = Scale(frame1, from_=0, to=200, orient=HORIZONTAL, length=810)
+sli1=DoubleVar(); slider_1 = Scale(frame1, from_=1, to=101, orient=HORIZONTAL, length=810, variable=sli1)
+slider_1.bind("<B1-Motion>", sliderdrag)
+slider_1.bind("<ButtonRelease-1>", release)
 slider_1.pack()
 
 # btn_1_2 = tkinter.Button(frame1, text="ㅁ")
@@ -441,14 +510,16 @@ yscrollbar.config(command=text_2_3.yview)
 
 
 combo_1_2 = Combobox(frame1)
-combo_1_2['values'] = ("Scenario-1 inverse(미완)", "Scenario-2 xor(미완)", "Scenario-3", "Scenario-4", "Scenario-5", "Scenario-6 테스트용", "Scenario-7 더미히든")
+combo_1_2['values'] = ("Scenario-1 inverse", "Scenario-2 xor", "Scenario-3 더미-히든", "Scenario-4", "Scenario-5", "Scenario-6", "Scenario-7", "Scenario-8", "Scenario-9")
 combo_1_2.bind("<<ComboboxSelected>>", scenario_act)
 combo_1_2.current(0)  # set the selected item
 
 # combo_1_1.place(x=150, y=0)
 combo_1_2.place(x=350, y=0)
 
-slider_2 = Scale(frame2, from_=0, to=200, orient=HORIZONTAL, length=800)
+sli2=DoubleVar(); slider_2 = Scale(frame2, from_=1, to=101, orient=HORIZONTAL, length=810, variable=sli2)
+slider_2.bind("<B1-Motion>", sliderdrag)
+slider_2.bind("<ButtonRelease-1>", release)
 slider_2.pack()
 
 #
@@ -500,6 +571,8 @@ vid3 = LoadDisplay(Origin_labelframe_2, 0, 0)
 vid4 = LoadDisplay(Modified_labelframe_2, 0, 0)
 
 
+for filename in glob("1t_youcandelete*"): os.remove(filename)
 window.mainloop()
+for filename in glob("1t_youcandelete*"): os.remove(filename)
 
 

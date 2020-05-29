@@ -539,7 +539,7 @@ elif goto == 3:                                                                 
             if re.match(d4, stream[i][::-1]).lastindex is 1: ttb += 1
 
 
-
+    tta +=1
     if (ttb / tta) > 0.4:
         print("(NALU: %d  ratio: %.2f)" % (tta, ttb / tta), "scenario found: dummy-hidden.")
     else:
