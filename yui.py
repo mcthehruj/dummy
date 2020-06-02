@@ -19,7 +19,7 @@ class LoadDisplay(object):  #ui 영상창 클래스
     def __init__(self, win, x, y):
         self.win = win
         self.frame = None
-        self.frame_count = 0
+        self.frame_count = 0.99
         self.x = x
         self.y = y
         self.f_width = 352
@@ -83,21 +83,23 @@ class LoadDisplay(object):  #ui 영상창 클래스
         self.name = os.path.splitext(self.video_source)[1]
 
         if not self.vid.isOpened(): # 열리지 않았다면
-            if os.path.isfile(self.video_source):
-                None        ## 경로만 존재해도 vid는 열린걸로 인식하는듯
+            if os.path.isfile(self.video_source):     ## YUV 케이스?
+                print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "YUV 지원안함")
             else:
                 print("@@@@@@@@@@@@@@@@@@@@@@@@@@@")             ## 영상 노존재
                 print("error, file not exist in %s" % self.video_source)
                 ## 에러영상 메세지 디스플레이기능 넣기
                 self.video_source = ""
+                return
 
         else:   # vid.isOpened 영상 정보를 얻자
             ret, self.frame = self.get_frame()  # 동영상의 초기 1프레임 얻어 띄우기
             if self.frame is None:             ## 파일은 존재하지만 디코딩이 안됐단뜻    ## IVC 디코더로 시도
+                Tempp = 1
                 self.vid.release();    print("IVC 디코더로 시도")
-                subprocess.run("ldecod_ivc.exe %s 1t_youcandelete_%s" % (self.video_source, os.path.basename(self.video_source)))     # 현재폴더에 재인코딩된 임시파일 생성
+                subprocess.run("ldecod_ivc.exe %s 1t_youcandelete_%s" % (self.video_source, os.path.basename(self.video_source)), stdout=subprocess.DEVNULL)     # 현재폴더에 재인코딩된 임시파일 생성
                 yuv_src = '1t_youcandelete_' + os.path.basename(self.video_source)
-                subprocess.run("ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i %s -c:v hevc -y %s.hevc" % (yuv_src, os.path.splitext(yuv_src)[0]))
+                subprocess.run("ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i %s -c:v hevc -y %s.hevc" % (yuv_src, os.path.splitext(yuv_src)[0]), stdout=subprocess.DEVNULL)
                 #if os.path.isfile(os.path.splitext(yuv_src)[0] + '.hevc'): 파일이존재하지않을이유는없을걸
                 if os.path.getsize(os.path.splitext(yuv_src)[0] + '.hevc') > 1:
                     self.vid = cv2.VideoCapture(os.path.splitext(yuv_src)[0] + '.hevc')
@@ -140,11 +142,8 @@ class LoadDisplay(object):  #ui 영상창 클래스
             ret, temframe = self.get_frame()  # Get a frame from the video source
             cur = self.vid.get(1)
             if self.frame_count < cur: self.frame_count = cur
-            if self.canvas.master.master.winfo_name() == '!frame' and self.canvas.master.winfo_name() == '!labelframe':
-                sli1.set((cur / self.frame_count) * 100)
-            if self.canvas.master.master.winfo_name() == '!frame2' and self.canvas.master.winfo_name() == '!labelframe':
-                sli2.set((cur / self.frame_count) * 100)
-
+            if self.canvas.master.winfo_name() == '!labelframe':  # labelframe2는 우측 디스플레이임, 즉 좌측디스플레이 기준으로 슬라이드가 움직인다
+                self.canvas.master.master.children['!scale'].set((cur / self.frame_count) * 100)
 
         if ret == 2:  # 일반 재생 시
             self.frame = temframe
@@ -276,6 +275,7 @@ def scenario_act(event):                    ### 변조과정 ###      각 연구
         print_dual(text_1_3, 'inverse 변조 중입니다..')
         bits_inv = bitstring.BitStream(~bitstring.Bits(filename=seq1))
         bits_inv.tofile(open(src_plus_name + '_inv' + ext, 'wb'))   # 경로/seq.확장자 -> 경로/seq_inv.확장자
+        vid2.changevideo(src_plus_name + '_inv' + ext)
         print_dual(text_1_3, '변조가 완료되었습니다.'); return
 
     elif event.widget.current() == 1:                             ## 시나리오2 xor 변조
@@ -286,6 +286,7 @@ def scenario_act(event):                    ### 변조과정 ###      각 연구
         decstream = xor_fast(decstream, count)
         bitstream = bitstring.BitStream('0b' + decstream)
         bitstream.tofile(open(src_plus_name + '_xor' + ext, 'wb'))  # 경로/seq.확장자 -> 경로/seq_xor.확장자
+        vid2.changevideo(src_plus_name + '_xor' + ext)
         print_dual(text_1_3, '변조가 완료되었습니다.'); return
 
     elif event.widget.current() == 2:                             ## 시나리오3 더미-히든 변조               현재 mpeg2,263,264,265,IVC 만 지원 됨
@@ -510,7 +511,7 @@ yscrollbar.config(command=text_2_3.yview)
 
 
 combo_1_2 = Combobox(frame1)
-combo_1_2['values'] = ("Scenario-1 inverse", "Scenario-2 xor", "Scenario-3 더미-히든", "Scenario-4", "Scenario-5", "Scenario-6", "Scenario-7", "Scenario-8", "Scenario-9")
+combo_1_2['values'] = ("Scenario-1 inverse", "Scenario-2 xor", "Scenario-3 더미-히든", "Scenario-4", "Scenario-5", "Scenario-6", "Scenario-7", "Scenario-8", "Scenario-9", "Scenario-10 ipconfig예제")
 combo_1_2.bind("<<ComboboxSelected>>", scenario_act)
 combo_1_2.current(0)  # set the selected item
 
