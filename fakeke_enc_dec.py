@@ -33,25 +33,38 @@ from os.path import basename
 # 더미-히든 시나리오는    더미(보여질미끼영상) 와 히든(숨길목적영상)을 하나의 264 스트림으로 만들어주는 시나리오 입니다
 
 def codecdecision(seq):
-    d0 = b'(\x00\x00\x01[\xB0-\xB5])'                                       # mpeg2
-    d1 = b'(\x00\x00[\x80-\x8F])'                                           # 263
-    d1_ex = b'(\x80\x00\x00[\x80-\x8F])'
-    d2 = b'(\x00\x00\x01[\x68|\x67|\x65|\x61|\x41|\x21|\x01])'              # 264
-    d3 = b'(\x00\x00\x01[\x40|\x41|\x42|\x43|\x44|\x4E|\x26|\x28|\x00|\x02|\x2A|\x10|\x12])'    # hevc 40, 41: VPS, 42, 43: SPS, 44: PPS, 4E: SEI, 26: IDR Frame
-    d3_ex = b'(\x00\x00\x01\x00[\x1F|\x01|\x80|\x00])'
-    d4 = b'(\x00\x00\x01[\x00|\xAF|\xB0|\xB1|\xB2|\xB3|\xB6|\xB7])'         # IVC
-    d4_ex = b'(\x00\x00\x01[\x00])'  # IVC
-    seq0    = re.split(d0,    seq);      del seq0[0];        seq0    = [x + y for x, y in zip(seq0[0::2],    seq0[1::2])] # 뭔지 모르는 2A, 10 12 추가함
-    seq1    = re.split(d1,    seq);      del seq1[0];        seq1    = [x + y for x, y in zip(seq1[0::2],    seq1[1::2])]
-    seq1_ex = re.split(d1_ex, seq);      del seq1_ex[0];     seq1_ex = [x + y for x, y in zip(seq1_ex[0::2], seq1_ex[1::2])]
-    seq2    = re.split(d2,    seq);      del seq2[0];        seq2    = [x + y for x, y in zip(seq2[0::2],    seq2[1::2])]
-    seq3    = re.split(d3,    seq);      del seq3[0];        seq3    = [x + y for x, y in zip(seq3[0::2],    seq3[1::2])]
-    seq3_ex = re.split(d3_ex, seq);      del seq3_ex[0];     seq3_ex = [x + y for x, y in zip(seq3_ex[0::2], seq3_ex[1::2])]
-    seq4    = re.split(d4,    seq);      del seq4[0];        seq4    = [x + y for x, y in zip(seq4[0::2],    seq4[1::2])]
-    seq4_ex = re.split(d4_ex, seq);      del seq4_ex[0];     seq4_ex = [x + y for x, y in zip(seq4_ex[0::2], seq4_ex[1::2])]
+    # 각 코덱의 스타트코드 특징 count
+    d0 = b'(\x00\x00\x01[\xB0-\xB8|\x03-\x11])'                                                 # mpeg2
+    d1 = b'(\x00\x00[\x80-\x8F])'                                                               # 263
+    d1_ex = b'(\x80\x00\x00[\x80-\x8F])'                                                        # 263 뒤집혔을때 잘못된 start code 제외
+    d2 = b'(\x00\x00\x01[\x68|\x67|\x65|\x61|\x41|\x21|\x01])'                                  # 264
+    d3 = b'(\x00\x00\x01[\x40|\x41|\x42|\x43|\x44|\x4E|\x26|\x28|\x00|\x02|\x2A|\x10|\x12])'    # hevc 40, 41: VPS, 42, 43: SPS, 44: PPS, 4E: SEI, 26: IDR Frame, 뭔지 모르는 2A, 10 12 추가함
+    d3_ex = b'(\x00\x00\x01\x00[\x1F|\x80|\x00])'                                               # IVC와 중복성 제거
+    d4 = b'(\x00\x00\x01[\x00|\xAF|\xB0|\xB1|\xB2|\xB3|\xB6|\xB7])'                             # IVC
+    seq0    = re.split(d0,    seq);  del seq0[0];    seq0    = [x + y for x, y in zip(seq0[0::2],    seq0[1::2])]
+    seq1    = re.split(d1,    seq);  del seq1[0];    seq1    = [x + y for x, y in zip(seq1[0::2],    seq1[1::2])]
+    seq1_ex = re.split(d1_ex, seq);  del seq1_ex[0]; seq1_ex = [x + y for x, y in zip(seq1_ex[0::2], seq1_ex[1::2])]
+    seq2    = re.split(d2,    seq);  del seq2[0];    seq2    = [x + y for x, y in zip(seq2[0::2],    seq2[1::2])]
+    seq3    = re.split(d3,    seq);  del seq3[0];    seq3    = [x + y for x, y in zip(seq3[0::2],    seq3[1::2])]
+    seq3_ex = re.split(d3_ex, seq);  del seq3_ex[0]; seq3_ex = [x + y for x, y in zip(seq3_ex[0::2], seq3_ex[1::2])]
+    seq4    = re.split(d4,    seq);  del seq4[0];    seq4    = [x + y for x, y in zip(seq4[0::2],    seq4[1::2])]
 
     #print("mpeg2: %d, 263: %d, 264: %d hevc: %d IVC: %d" % (len(seq0), len(seq1)-len(seq1_ex), len(seq2), len(seq3)-len(seq3_ex), len(seq4)))
-    cdx = [len(seq0), len(seq1)-len(seq1_ex), len(seq2), len(seq3)-len(seq3_ex), len(seq4)-len(seq4_ex)*0.5].index(max([len(seq0), len(seq1)-len(seq1_ex), len(seq2), len(seq3)-len(seq3_ex), len(seq4)-len(seq4_ex)*0.5]))
+    # codec 결정
+    cdx = [len(seq0), len(seq1)-len(seq1_ex), len(seq2), len(seq3)-len(seq3_ex), len(seq4)].index(max([len(seq0), len(seq1)-len(seq1_ex), len(seq2), len(seq3)-len(seq3_ex), len(seq4)]))
+
+    # 실제 사용할 start code 별로 seq split
+    d0 = b'(\x00\x00\x01[\xB0-\xB5])'                                                           # mpeg2
+    d1 = b'(\x00\x00[\x80-\x8F])'                                                               # 263
+    d2 = b'(\x00\x00\x01[\x68|\x67|\x65|\x61|\x41|\x21|\x01])'                                  # 264
+    d3 = b'(\x00\x00\x01[\x40|\x41|\x42|\x43|\x44|\x4E|\x26|\x28|\x00|\x02|\x2A|\x10|\x12])'    # hevc
+    d4 = b'(\x00\x00\x01[\x00|\xAF|\xB0|\xB1|\xB2|\xB3|\xB6|\xB7])'                             # ICV
+    seq0    = re.split(d0,    seq);  del seq0[0];    seq0    = [x + y for x, y in zip(seq0[0::2],    seq0[1::2])]
+    seq1    = re.split(d1,    seq);  del seq1[0];    seq1    = [x + y for x, y in zip(seq1[0::2],    seq1[1::2])]
+    seq2    = re.split(d2,    seq);  del seq2[0];    seq2    = [x + y for x, y in zip(seq2[0::2],    seq2[1::2])]
+    seq3    = re.split(d3,    seq);  del seq3[0];    seq3    = [x + y for x, y in zip(seq3[0::2],    seq3[1::2])]
+    seq4    = re.split(d4,    seq);  del seq4[0];    seq4    = [x + y for x, y in zip(seq4[0::2],    seq4[1::2])]
+
     return [seq0, seq1, seq2, seq3, seq4][cdx], cdx
 
 if (len(sys.argv) == 1):   #### goto 1:변조모드로    2:복조모드로    3:변조여부판단모드로    4:인자오류메세지출력으로
