@@ -541,15 +541,25 @@ elif goto == 3:                                                                 
 
     for i in range(len(stream)):
         if cdx is 0:
-            if re.match(d0, stream[i][::-1]).lastindex is 1: ttb += 1
+            try:
+                if re.match(d0, stream[i][::-1]).lastindex is 1: ttb += 1
+            except: pass
         if cdx is 1:
-            if re.match(d1, stream[i][::-1]).lastindex is 1: ttb += 1
+            try:
+                if re.match(d1, stream[i][::-1]).lastindex is 1: ttb += 1
+            except: pass
         if cdx is 2:
-            if re.match(d2, stream[i][::-1]).lastindex is 1: ttb += 1
+            try:
+                if re.match(d2, stream[i][::-1]).lastindex is 1: ttb += 1
+            except: pass
         if cdx is 3:
-            if re.match(d3, stream[i][::-1]).lastindex is 1: ttb += 1
+            try:
+                if re.match(d3, stream[i][::-1]).lastindex is 1: ttb += 1
+            except: pass
         if cdx is 4:
-            if re.match(d4, stream[i][::-1]).lastindex is 1: ttb += 1
+            try:
+                if re.match(d4, stream[i][::-1]).lastindex is 1: ttb += 1
+            except: pass
 
 
     tta +=1

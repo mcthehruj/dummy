@@ -83,8 +83,29 @@ class LoadDisplay(object):  #ui 영상창 클래스
         self.name = os.path.splitext(self.video_source)[1]
 
         if not self.vid.isOpened(): # 열리지 않았다면
-            if os.path.isfile(self.video_source):     ## YUV 케이스?
-                print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "YUV 지원안함")
+            if os.path.isfile(self.video_source):                ## 영상 존재   png,  YUV 케이스?
+                print("imread로 시도")
+                self.frame = cv2.imread(self.video_source)
+                if self.frame is not None:          # imread로 열렸다면
+                    b, g, r = cv2.split(self.frame); self.frame = cv2.merge([r, g, b])
+                    self.i_width = self.frame.shape[1]
+                    self.i_height = self.frame.shape[0]
+                    ratio = 352 / self.i_width
+                    self.zoom_x = ratio;
+                    self.zoom_y = ratio;
+                    self.move_x = 0;
+                    self.move_y = 0;
+                    self.frame = cv2.resize(self.frame, None, fx=1, fy=1, interpolation=cv2.INTER_LINEAR)
+                    self.frame_num_p = 0
+                    window.update()
+                    time.sleep(0.01)
+                    sli1.set(0)
+                    sli2.set(0)
+                    return self.video_source
+                else:
+                    print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "YUV 파일 지원안함")
+                    self.vid = cv2.VideoCapture('errd2.png') ; print('오류디스플레이 출력')
+                    ret, self.frame = self.get_frame()
             else:
                 print("@@@@@@@@@@@@@@@@@@@@@@@@@@@")             ## 영상 노존재
                 print("error, file not exist in %s" % self.video_source)
@@ -92,10 +113,9 @@ class LoadDisplay(object):  #ui 영상창 클래스
                 self.video_source = ""
                 return
 
-        else:   # vid.isOpened 영상 정보를 얻자
+        else:   # vid.isOpened True 일때:  영상 정보를 얻자
             ret, self.frame = self.get_frame()  # 동영상의 초기 1프레임 얻어 띄우기
             if self.frame is None:             ## 파일은 존재하지만 디코딩이 안됐단뜻    ## IVC 디코더로 시도
-                Tempp = 1
                 self.vid.release();    print("IVC 디코더로 시도")
                 subprocess.run("ldecod_ivc.exe %s 1t_youcandelete_%s" % (self.video_source, os.path.basename(self.video_source)), stdout=subprocess.DEVNULL)     # 현재폴더에 재인코딩된 임시파일 생성
                 yuv_src = '1t_youcandelete_' + os.path.basename(self.video_source)
@@ -109,17 +129,17 @@ class LoadDisplay(object):  #ui 영상창 클래스
             self.frame_count = self.vid.get(cv2.CAP_PROP_FRAME_COUNT)                   ##### 정리좀 할것
             if self.frame_count < 1 or self.frame_count > 30000:  #음수거나 너무크면
                 self.frame_count = 300 ; self.vid.set(7,300); print('프레임카운트 헤더에 오류가 있음', self.frame_count, '으로 변경')
-            self.i_width = self.vid.get(3)
-            self.i_height = self.vid.get(4)
-            ratio = 352 / self.i_width
-            self.zoom_x=ratio; self.zoom_y=ratio; self.move_x=0; self.move_y=0;
-            self.frame = cv2.resize(self.frame, None, fx=1, fy=1, interpolation=cv2.INTER_LINEAR)
-            self.frame_num_p = 0
-            window.update()
-            time.sleep(0.01)
-            sli1.set(0)
-            sli2.set(0)
-            return self.video_source
+        self.i_width = self.vid.get(3)
+        self.i_height = self.vid.get(4)
+        ratio = 352 / self.i_width
+        self.zoom_x=ratio; self.zoom_y=ratio; self.move_x=0; self.move_y=0;
+        self.frame = cv2.resize(self.frame, None, fx=1, fy=1, interpolation=cv2.INTER_LINEAR)
+        self.frame_num_p = 0
+        window.update()
+        time.sleep(0.01)
+        sli1.set(0)
+        sli2.set(0)
+        return self.video_source
 
     def get_frame(self):
         if self.vid.isOpened():  # self.vid.set(cv2.CV_CAP_PROP_POS_FRAMES, frame_number - 1)
@@ -337,24 +357,24 @@ def scenario_inv_act():                       ### 복조과정   시나리오별
     print_dual(text_2_3, '1. 시나리오 적용여부 판단 중입니다..')
 
     non_block_threding_popen(text_2_3, "python.exe fakeke_enc_dec.py %s" % seq1)            # 1.1 더미-히든 판별모드 실행 (임시 하드코딩)
-    if text_2_3.get('end-2lines', END)[-9:-3] == 'hidden': None                             # 더미-히든시나리오로 판단됐다면 상민딥 안돌리고 통과
+    if 'hidden' in text_2_3.get('end-2lines', END): None                                    # 더미-히든시나리오로 판단됐다면 상민딥 안돌리고 통과
     else: non_block_threding_popen(text_2_3, "python.exe 상민딥예측.py %s" % seq1)            # 1.2 더미-히든 아닐경우 상민딥 돌림
                                                                                             #     MPEG2 H.263 H.264 H.265 IVC VP8 JPEG JPEG2000 BMP PNG TIFF 코덱과
                                                                                             #     'default', 'inverse', 'xor' 시나리오에 대해 판별함
     catched_last1_line = text_2_3.get('end-2lines', END)
     ####################################### 2.  복조 과정                                    # 복조과정      각 연구실별 작성 요망
     print_dual(text_2_3, '2. 시나리오 복조를 시작합니다.')
-    if catched_last1_line[-9:-2] == 'default':                #시나리오 적용 안된 경우
+    if 'default' in catched_last1_line:                     #시나리오 적용 안된 경우
         print_dual(text_2_3, '변조된 내역이 없습니다.'); return
 
-    elif catched_last1_line[-9:-2] == 'inverse':              #시나리오 1 inverse 복조
+    elif 'inverse' in catched_last1_line:                   #시나리오 1 inverse 복조
         print_dual(text_2_3, 'inverse 복조 중입니다..')
         bits_inv = bitstring.BitStream(~bitstring.Bits(filename=seq1))
         bits_inv.tofile(open(src_plus_name + '_rev' + ext, 'wb'))
         vid4.changevideo(src_plus_name + '_rev' + ext)
         print_dual(text_2_3, '복조가 완료되었습니다.'); return
 
-    elif catched_last1_line[-5:-2] == 'xor':                   #시나리오 2 xor 복조
+    elif 'xor' in catched_last1_line:                       #시나리오 2 xor 복조
         print_dual(text_2_3, 'xor 복조 중입니다..')
         bitstream = bitstring.ConstBitStream(filename=seq1)
         decstream = bitstream.read(bitstream.length).bin
@@ -365,32 +385,32 @@ def scenario_inv_act():                       ### 복조과정   시나리오별
         vid4.changevideo(src_plus_name + '_rev' + ext)
         print_dual(text_2_3, '복조가 완료되었습니다.'); return
 
-    elif catched_last1_line[-15:-2] == 'dummy-hidden.':         #시나리오 3     # 더미-히든 복조
+    elif 'dummy-hidden.' in catched_last1_line:             #시나리오 3     # 더미-히든 복조
         print_dual(text_2_3, "dummy-hidden restore start")
         non_block_threding_popen(text_2_3, "python.exe fakeke_enc_dec.py %s %s" % (seq1, '1'))    # 더미-히든 시나리오 복조모드 실행
         vid4.changevideo(src_plus_name + '_rev' + ext)          # 복조된 _rev 파일 디스플레이
         print_dual(text_2_3, "dummy-hidden restore complete") ; return
 
-    elif catched_last1_line[-6:-2] == '장의선교수님연구실시나리오1':#시나리오 4
+    elif '장의선교수님연구실시나리오1' in catched_last1_line:    #시나리오 4
         None            # 연구실별 복조 코드s here
 
-    elif catched_last1_line[-6:-2] == '장의선교수님연구실시나리오2':#시나리오 5
+    elif '장의선교수님연구실시나리오2' in catched_last1_line:    #시나리오 5
         None            # 연구실별 복조 코드s here
 
-    elif catched_last1_line[-6:-2] == '장의선교수님연구실시나리오3':#시나리오 6
+    elif '장의선교수님연구실시나리오3' in catched_last1_line:    #시나리오 6
         None            # 연구실별 복조 코드s here
 
-    elif catched_last1_line[-6:-2] == '김창수교수님연구실시나리오1':#시나리오 7
+    elif '김창수교수님연구실시나리오1' in catched_last1_line:    #시나리오 7
         None            # 연구실별 복조 코드s here
 
-    elif catched_last1_line[-6:-2] == '김창수교수님연구실시나리오2':#시나리오 8
+    elif '김창수교수님연구실시나리오2' in catched_last1_line:    #시나리오 8
         None            # 연구실별 복조 코드s here
 
-    elif catched_last1_line[-6:-2] == '김창수교수님연구실시나리오3':#시나리오 9
+    elif '김창수교수님연구실시나리오3' in catched_last1_line:    #시나리오 9
         None            # 연구실별 복조 코드s here
 
     else:
-        print(catched_last1_line[:-2], "<- 이 메세지 인식불가 복조 시나리오로 넘어가지 못했습니다")  ##
+        print(catched_last1_line[:-2], "<- 이 마지막 메세지를 인식하지 못했기에 복조 시나리오로 넘어가지 못했습니다")  ##
 
 
 

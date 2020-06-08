@@ -147,7 +147,7 @@ if __name__ == "__main__":          #def sangmin_deep_predict(mode, src):
         src = sys.argv[1]
         text = 0    #안쓰는 변수
 
-        print('1. preparing trained model for codec classification...')
+        print('1. preparing trained model for codec classification... ', end=''); print("cuda" if torch.cuda.is_available() else "cpu")
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = BiLSTM_Attention()
         model.to(device)
