@@ -11,6 +11,35 @@ import PIL.ImageTk
 import cv2
 from utils import *
 
+class VideoCaptureYUV:
+    def __init__(self, filename, size):
+        self.height, self.width = size
+        self.frame_len = self.width * self.height * 3 / 2
+        self.f = open(filename, 'rb')
+        self.shape = (int(self.height*1.5), self.width)
+
+    def isOpened(self):
+        return 0
+    def read_raw(self):
+        try:
+            raw = self.f.read(int(self.frame_len))
+            yuv = np.frombuffer(raw, dtype=np.uint8)
+            yuv = yuv.reshape(self.shape)
+        except Exception as e:
+            print(str(e))
+            return False, None
+        return True, yuv
+
+    def read(self):
+        ret, yuv = self.read_raw()
+        if not ret:
+            return ret, yuv
+        bgr = cv2.cvtColor(yuv, cv2.COLOR_YUV420p2BGR)
+        return ret, bgr
+
+
+
+
 
 class LoadDisplay(object):  #ui 영상창 클래스
     #추가해야할 디스플레이 클래스 기능: 프로그래스바, 모든비디오시퀀스가 33ms의 프레임레이트를 가지는문제, 드래그시 클릭되는 문제
@@ -75,6 +104,11 @@ class LoadDisplay(object):  #ui 영상창 클래스
         if src == '':
             self.video_source = askopenfilename(initialdir="dataset/training_set/", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.")
             if self.video_source == '': return  # ask 창 cancel 한 경우
+        elif src == 'close':
+            self.vid = cv2.VideoCapture('clod.png'); print('디스플레이 닫기,, 흰색디스플레이 하하')
+            ret, self.frame = self.get_frame()
+            self.vid.release()
+            return
         else:
             self.video_source = src
 
@@ -84,9 +118,9 @@ class LoadDisplay(object):  #ui 영상창 클래스
 
         if not self.vid.isOpened(): # 열리지 않았다면
             if os.path.isfile(self.video_source):                ## 영상 존재   png,  YUV 케이스?
-                print("imread로 시도")
+                print('(debug) imread로 시도')
                 self.frame = cv2.imread(self.video_source)
-                if self.frame is not None:          # imread로 열렸다면
+                if self.frame is not None:                      # imread로 열기 성공
                     b, g, r = cv2.split(self.frame); self.frame = cv2.merge([r, g, b])
                     self.i_width = self.frame.shape[1]
                     self.i_height = self.frame.shape[0]
@@ -102,10 +136,16 @@ class LoadDisplay(object):  #ui 영상창 클래스
                     sli1.set(0)
                     sli2.set(0)
                     return self.video_source
-                else:
-                    print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "YUV 파일 지원안함")
-                    self.vid = cv2.VideoCapture('errd2.png') ; print('오류디스플레이 출력')
-                    ret, self.frame = self.get_frame()
+                else:                                           # imread로 열기 실패
+                    if '.yuv' in self.video_source:
+                        self.vid = VideoCaptureYUV(self.video_source, (288, 352))
+                        ret, self.frame = self.vid.read()
+                        print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "(debug) YUV 열기 완료, 이미지는 보이나 인코딩된 상태가 아니기 때문에 시나리오 적용 불가")
+                        return self.video_source
+                    else:
+                        #print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "(debug) 무엇을 연것?")
+                        self.vid = cv2.VideoCapture('errd2.png') ; print('오류디스플레이 출력')
+                        ret, self.frame = self.get_frame()
             else:
                 print("@@@@@@@@@@@@@@@@@@@@@@@@@@@")             ## 영상 노존재
                 print("error, file not exist in %s" % self.video_source)
@@ -312,6 +352,7 @@ def scenario_act(event):                    ### 변조과정 ###      각 연구
     elif event.widget.current() == 2:                             ## 시나리오3 더미-히든 변조               현재 mpeg2,263,264,265,IVC 만 지원 됨
         print_dual(text_1_3, '숨길 영상을 추가로 선택 해 주세요')
         seq2 = askopenfilename(initialdir="", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.") # 더미-히든 변조과정에 필요한 추가시퀀스(히든) 열기
+        if seq2 == '': print_dual(text_1_3, '취소되었습니다'); return
         print_dual(text_1_3, '더미-히든 변조 중입니다..')
         non_block_threding_popen(text_1_3, "python.exe fakeke_enc_dec.py %s %s" % (seq1, seq2))                         # 더미-히든 시나리오 변조 실행
         seq3 = os.path.splitext(seq1)[0] + '_' + os.path.basename(seq2)
@@ -347,8 +388,9 @@ def scenario_act(event):                    ### 변조과정 ###      각 연구
 # 1. 어떤 시나리오가 적용되어있는지 판단
 # 2. 판단된 시나리오로 각 연구실의 복조과정 실행
 def scenario_inv_act():                       ### 복조과정   시나리오별로 각 연구실에서 작성한 win32어플리케이션을 인자전달해서 복조 하도록 해주세요
-    seq1 = vid3.changevideo();  # 영상 ask창으로 불러오기
-    if seq1 == '': return       # 사용자가 ask 창을 캔슬 누른 경우 아웃
+    seq1 = vid3.changevideo();   # 영상 ask창으로 불러오기
+    if seq1 == '': return                            # 사용자가 ask 창을 캔슬 누른 경우 아웃
+    vid4.changevideo('close');
     src_plus_name = os.path.splitext(seq1)[0]           # 파일경로+파일이름
     ext           = os.path.splitext(seq1)[1]           # 확장자
     name          = os.path.basename(src_plus_name)     # 파일이름
@@ -370,8 +412,8 @@ def scenario_inv_act():                       ### 복조과정   시나리오별
     elif 'inverse' in catched_last1_line:                   #시나리오 1 inverse 복조
         print_dual(text_2_3, 'inverse 복조 중입니다..')
         bits_inv = bitstring.BitStream(~bitstring.Bits(filename=seq1))
-        bits_inv.tofile(open(src_plus_name + '_rev' + ext, 'wb'))
-        vid4.changevideo(src_plus_name + '_rev' + ext)
+        bits_inv.tofile(open(src_plus_name + '_restored' + ext, 'wb'))
+        vid4.changevideo(src_plus_name + '_restored' + ext)
         print_dual(text_2_3, '복조가 완료되었습니다.'); return
 
     elif 'xor' in catched_last1_line:                       #시나리오 2 xor 복조
@@ -381,14 +423,14 @@ def scenario_inv_act():                       ### 복조과정   시나리오별
         count = factor(len(decstream))
         decstream = dxor_fast(decstream, count)
         bitstream = bitstring.BitStream('0b' + decstream)
-        bitstream.tofile(open(src_plus_name + '_rev' + ext, 'wb'))
-        vid4.changevideo(src_plus_name + '_rev' + ext)
+        bitstream.tofile(open(src_plus_name + '_restored' + ext, 'wb'))
+        vid4.changevideo(src_plus_name + '_restored' + ext)
         print_dual(text_2_3, '복조가 완료되었습니다.'); return
 
     elif 'dummy-hidden.' in catched_last1_line:             #시나리오 3     # 더미-히든 복조
         print_dual(text_2_3, "dummy-hidden restore start")
         non_block_threding_popen(text_2_3, "python.exe fakeke_enc_dec.py %s %s" % (seq1, '1'))    # 더미-히든 시나리오 복조모드 실행
-        vid4.changevideo(src_plus_name + '_rev' + ext)          # 복조된 _rev 파일 디스플레이
+        vid4.changevideo(src_plus_name + '_restored' + ext)          # 복조된 _restored 파일 디스플레이
         print_dual(text_2_3, "dummy-hidden restore complete") ; return
 
     elif '장의선교수님연구실시나리오1' in catched_last1_line:    #시나리오 4
@@ -410,7 +452,7 @@ def scenario_inv_act():                       ### 복조과정   시나리오별
         None            # 연구실별 복조 코드s here
 
     else:
-        print(catched_last1_line[:-2], "<- 이 마지막 메세지를 인식하지 못했기에 복조 시나리오로 넘어가지 못했습니다")  ##
+        print(catched_last1_line[:-2], "<- 이 마지막 메세지를 인식하지 못했기에 복조 시나리오로 넘어가지 못했습니다. 혹은 복조 프로세스 오류종료 하였음")  ##
 
 
 
@@ -450,6 +492,20 @@ def sliderdrag(event):
 window = tkinter.Tk()
 window.title('UI test')
 window.geometry("900x700+200+200")
+
+style = tkinter.ttk.Style()         # https://wiki.tcl-lang.org/page/List+of+ttk+Themes
+style.theme_create( "yummy", parent='winnative', settings={                   #커스텀 스타일을 만들어야만 탭배경색이 변경가능하데
+        "TNotebook": {"configure": {"tabmargins": [3, 4, 0, 0] } },
+        "TNotebook.Tab": {
+            "configure": {"padding": [11, 4], "background": '#cfdfc5' },#흰국방색
+            "map":       {"background": [("selected", '#FFFFFF')],      #흰색
+                          "expand": [("selected", [1, 1, 1, 1])] } } } )
+style.theme_use("yummy")
+tkinter.ttk.Style().configure("TNotebook", background='#536349')        #국방색
+
+# tkinter.ttk.Style().configure("TNotebook", background='#536349')        #국방색
+# tkinter.ttk.Style().configure('TNotebook.Tab', padding=[11, 4], background='red',foreground='blue' )
+# tkinter.ttk.Style().map('TNotebook.Tab', background=[('selected', 'yellow')])
 
 notebook = tkinter.ttk.Notebook(window, width=900, height=600)
 notebook.pack()
@@ -553,7 +609,7 @@ slider_2.pack()
 # btn_4 = tkinter.Button(window, text='recover', command=lambda: vid4.changevideo(), compound=LEFT)
 
 #text_1_1 = Text(frame1,width = 10,height=1 )
-btn_1_1 = tkinter.Button(frame1, text="input stream", command=lambda: vid1.changevideo())
+btn_1_1 = tkinter.Button(frame1, text="input stream", command=lambda: vid2.changevideo('close') + vid1.changevideo())
 #btn_1_2 = tkinter.Button(frame1, text="Encode", command=lambda: vid2.detect(text_1_3, combo_1_2.current()+1, codec_list.index(os.path.splitext(vid1.video_source)[1]), os.path.splitext(vid1.video_source)[0]))
 # vid2.detect(text_1_3)
 # vid2.detect(text_1_3, combo_1_2.current()+1, codec_list.index(os.path.splitext(vid1.video_source)[1]), os.path.splitext(vid1.video_source)[0])

@@ -143,7 +143,7 @@ def print_dual_nocl(text, aa):
 if __name__ == "__main__":          #def sangmin_deep_predict(mode, src):
     if (len(sys.argv) == 2):
         src = sys.argv[1]
-
+        print('running with','cuda' if torch.cuda.is_available() else 'cpu', 'environments')
         print('testing what the codec of encoded bitstream is...')  # 코덱분류
         video = bitstring.ConstBitStream(filename=src)
         video = video.read(video.length).bin
