@@ -46,9 +46,9 @@ alphabet = ['a', 'b', 'c', 'd', 'e', 'f']
 scenario_list = ['default', 'inverse', 'xor']
 # Bi-LSTM(Attention) Parameters
 embedding_dim = 64  # 2
-n_hidden = 32       # 24
+# n_hidden = 32       # 24
 num_classes = len(codec_list)
-all_bytes_in_a_sentence = 128   # 128
+# all_bytes_in_a_sentence = 128   # 128
 shift_bytes_in_a_sentence = 1
 num_chars_in_a_word = 1
 dataset = 16        # 32
@@ -79,17 +79,18 @@ vocab_size = len(word_dict)
 
 # Network
 class BiLSTM_Attention(nn.Module):
-    def __init__(self):
+    def __init__(self, n_hidden):
         super(BiLSTM_Attention, self).__init__()
 
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
         self.lstm = nn.LSTM(embedding_dim, n_hidden, bidirectional=True)
         self.out = nn.Linear(n_hidden * 2, num_classes)
+        self.n_hidden = n_hidden
 
         # lstm_output : [batch_size, n_step, n_hidden * num_directions(=2)], F matrix
 
     def attention_net(self, lstm_output, final_state):
-        hidden = final_state.view(-1, n_hidden * 2, 1)
+        hidden = final_state.view(-1, self.n_hidden * 2, 1)
         # hidden : [batch_size, n_hidden * num_directions(=2), 1(=n_layer)]
         # print(hidden[ind])
         attn_weights = torch.bmm(lstm_output, hidden).squeeze(2)
@@ -108,9 +109,9 @@ class BiLSTM_Attention(nn.Module):
         # print(input[ind])
         input = input.permute(1, 0, 2) # input : [len_seq, batch_size, embedding_dim]
 
-        hidden_state = Variable(torch.zeros(1*2, len(X), n_hidden)).cuda()
+        hidden_state = Variable(torch.zeros(1*2, len(X), self.n_hidden)).cuda()
         # [num_layers(=1) * num_directions(=2), batch_size, n_hidden]
-        cell_state = Variable(torch.zeros(1*2, len(X), n_hidden)).cuda()
+        cell_state = Variable(torch.zeros(1*2, len(X), self.n_hidden)).cuda()
         # [num_layers(=1) * num_directions(=2), batch_size, n_hidden]
 
         # final_hidden_state, final_cell_state : [num_layers(=1) * num_directions(=2), batch_size, n_hidden]
@@ -123,70 +124,67 @@ class BiLSTM_Attention(nn.Module):
 
 def scenario_detect(frequency, video, count):
     if frequency.index(max(frequency)) == 0:                                                # MPEG2
-        print(codec[frequency.index(max(frequency))])
         ssc = [hex2bin('000001b3')]                                                         # 스타트 코드들 저장
         sec = [hex2bin('000001b5')]
         gop = [hex2bin('000001b8')]
         psc = [hex2bin('00000100')]
     elif frequency.index(max(frequency)) == 1:                                              # H.263
-        print(codec[frequency.index(max(frequency))])
-        # ssc = [hex2bin('000080'), hex2bin('000081'), hex2bin('000082'), hex2bin('000083')]  # psc
-        # sec = [hex2bin('0000fc'), hex2bin('0000fd'), hex2bin('0000fe'), hex2bin('0000ff')]  # eos
-        # gop = [hex2bin('0000f8'), hex2bin('0000f9')]                                        # eosbs
-        ssc = ['0000000000000000100000']
+        ssc = [hex2bin('000080'), hex2bin('000081'), hex2bin('000082'), hex2bin('000083')]  # psc
+        # sec = [hex2bin('0000fc'), hex2bin('0000fd'), hex2bin('0000fe'), hex2bin('0000ff')]# eos
+        # gop = [hex2bin('0000f8'), hex2bin('0000f9')]                                      # eosbs
+        # sec = []
         sec = []                                                                            # gbsc
-        gop = []                                                                            # too long
-        psc = []                                                                            # None
+        # """
+        for i in range(8, 16):
+            if i >= 11:
+                j = alphabet[i - 11]
+            else:
+                j = str(i)
+            sec.append(hex2bin('0000' + j))
+        # """
+        gop = []
+        psc = []
     elif frequency.index(max(frequency)) == 2:                                              # H.264
-        print(codec[frequency.index(max(frequency))])
         ssc = [hex2bin('0000000167')]                                                       # sps
         sec = [hex2bin('0000000168')]                                                       # pps
         gop = [hex2bin('0000000165'), hex2bin('0000010605')]                                # idr
         psc = [hex2bin('0000000141')]                                                       # nidr
     elif frequency.index(max(frequency)) == 3:                                              # H.265
-        print(codec[frequency.index(max(frequency))])
         ssc = [hex2bin('000001')]                                                           # sps
         sec = [hex2bin('000003')]                                                           # pps
         gop = []                                                                            # idr
         psc = []                                                                            # nidr
     elif frequency.index(max(frequency)) == 4:                                              # IVC
-        print(codec[frequency.index(max(frequency))])
         ssc = [hex2bin('000001b0')]                                                         # vsc
         sec = [hex2bin('00000100')]                                                         # vec
         gop = [hex2bin('000001b2')]                                                         # usc
         psc = [hex2bin('000001b3')]                                                         # udc
     elif frequency.index(max(frequency)) == 5:                                              # VP8
-        print(codec[frequency.index(max(frequency))])
         ssc = [hex2bin('1a45dfa3010000000000001f')]                                         # sc
         sec = [hex2bin('7765626d')]                                                         # webm
         gop = [hex2bin('1549a96601')]                                                       # ed1
         psc = [hex2bin('00000000000032')]                                                   # ed2
     elif frequency.index(max(frequency)) == 6:                                              # JPEG
-        print(codec[frequency.index(max(frequency))])
         ssc = [hex2bin('ffd8')]                                                             # sc
         sec = [hex2bin('ffc0'), hex2bin('ffc2')]                                            # sof
         gop = []                                                                            # None
         psc = []                                                                            # None
     elif frequency.index(max(frequency)) == 7:                                              # JPEG2000
-        print(codec[frequency.index(max(frequency))])
         ssc = [hex2bin('ff4f')]                                                             # sc
         sec = [hex2bin('ff90')]                                                             # sot
         gop = [hex2bin('ff93')]                                                             # sod
-        psc = [hex2bin('ff51')]                                                             # siz
+        psc = []                                                                            # siz
     elif frequency.index(max(frequency)) == 8:                                              # BMP
-        print(codec[frequency.index(max(frequency))])
         ssc = [hex2bin('424d')]                                                             # hd1
         sec = [hex2bin('28000000'), hex2bin('0c000000'), hex2bin('40000000'), hex2bin('6c000000'), hex2bin('7c000000')]
         gop = []                                                                            # V3
         psc = []                                                                            # None
     elif frequency.index(max(frequency)) == 9:                                              # PNG
-        print(codec[frequency.index(max(frequency))])
         ssc = [hex2bin('89504e47')]                                                         # hd1
         sec = [hex2bin('49484452')]                                                         # ihdr
         gop = [hex2bin('49444154')]                                                         # idat
         psc = []                                                                            # None
     elif frequency.index(max(frequency)) == 10:                                             # TIFF
-        print(codec[frequency.index(max(frequency))])
         ssc = [hex2bin('4949'), hex2bin('4d4d')]                                            # hd1
         sec = [hex2bin('002a'), hex2bin('2a00')]                                            # hd2
         gop = []                                                                            # None
@@ -203,25 +201,56 @@ def scenario_detect(frequency, video, count):
         for l in range(all):
             if hh[h][l] == 0:
                 condition[h] = False
+            # """
+            if codec[frequency.index(max(frequency))] == 'H.263' and hh[h][1] >= 10:    # 헤더의 수가 너무 많으면 믿지 않는다
+                condition[h] = False
+            if codec[frequency.index(max(frequency))] == 'TIFF' and hh[h][0] != 1:      # 헤더의 수가 너무 많으면 믿지 않는다
+                condition[h] = False
+            # """
         if condition[h]:
             detected_scenario = h + 1
-            print('# of %s headers ->' % scenario_list[h], hh[h])
+            print('# of %s headers ->' % scenario_list[detected_scenario], hh[h])
             if detected_scenario == 1:
                 video = encode(video, 'inv')
             elif detected_scenario == 2:
                 video = dxor_fast(video, count)
-            elif detected_scenario == 3:
-                pass
-                # dummy 시나리오 복조 추가
             return detected_scenario, video
         else:
             continue
     print('Unknown scenario or codec mismatched!')
     print('Let me try the second best prediction!')
     frequency[frequency.index(max(frequency))] = 0
+    print(codec[frequency.index(max(frequency))])
     video = bitstring.BitStream('0b' + video)
     detected_scenario, video = scenario_detect(frequency, video, count)
     return detected_scenario, video
+
+
+def codec_decide(video, mode='image'):
+    video.pos = 0
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if mode == 'image':                 # 정보를 최대한 많이 받는 게 중요
+        n_hidden = 32
+        all_bytes_in_a_sentence = 128
+    elif mode == 'video':               # 면밀한 분류를 하는 것이 중요
+        n_hidden = 128
+        all_bytes_in_a_sentence = 32
+    model = BiLSTM_Attention(n_hidden)
+    model.to(device)
+    if mode == 'image':
+        a = torch.load(glob('Bi-LSTM_96.73.pth')[0])
+    elif mode == 'video':
+        a = torch.load(glob('Bi-LSTM_97.94.pth')[0])
+    model.load_state_dict(a)
+    frequency = [0] * num_classes       # MPEG-2, H.263, H.264,... 의 예측값의 빈도수를 각각 저장
+    limit = (dataset - 1) * shift_bytes_in_a_sentence + all_bytes_in_a_sentence     # 학습시킨 데이터 길이만큼만 검증
+    for i in range(limit):
+        tt = video.read(all_bytes_in_a_sentence * int(math.log2(16))).hex
+        video.pos -= all_bytes_in_a_sentence * int(math.log2(16))
+        video.pos += shift_bytes_in_a_sentence * int(math.log2(16))
+        predict = test(tt, test_scenario, num_chars_in_a_word, model)
+        frequency[predict] += 1
+    return frequency
 
 
 def xor_header(header_list, xor_flag=1):                                # 원래 코덱의 스타트 코드 검색 리스트

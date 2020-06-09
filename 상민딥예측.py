@@ -139,40 +139,37 @@ def print_dual_nocl(text, aa):
     # text.update()
 
 
-
-
 ################ 메인함수
 if __name__ == "__main__":          #def sangmin_deep_predict(mode, src):
     if (len(sys.argv) == 2):
         src = sys.argv[1]
-        text = 0    #안쓰는 변수
 
-        print('1. preparing trained model for codec classification... ', end=''); print("cuda" if torch.cuda.is_available() else "cpu")
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model = BiLSTM_Attention()
-        model.to(device)
-        a = torch.load(glob('Bi-LSTM_96.73.pth')[0])
-        model.load_state_dict(a)
-
-        print('2. testing what the codec of encoded bitstream is...')  # 코덱분류
+        print('testing what the codec of encoded bitstream is...')  # 코덱분류
         video = bitstring.ConstBitStream(filename=src)
         video = video.read(video.length).bin
         count = factor(len(video))
         video = bitstring.BitStream('0b' + video)                           #video.tofile(open('decoded' + name[1], 'wb'))
-        video.pos = 0
-        frequency = [0] * num_classes  # MPEG-2, H.263, H.264,... 의 예측값의 빈도수를 각각 저장
-        limit = (dataset - 1) * shift_bytes_in_a_sentence + all_bytes_in_a_sentence  # 학습시킨 데이터 길이만큼만 검증
-        for i in range(limit):
-            tt = video.read(all_bytes_in_a_sentence * int(math.log2(16))).hex
-            video.pos -= all_bytes_in_a_sentence * int(math.log2(16))
-            video.pos += shift_bytes_in_a_sentence * int(math.log2(16))
-            predict = test(tt, test_scenario, num_chars_in_a_word, model)
-            frequency[predict] += 1
-        print(frequency)
-
-        print('3. testing what the scenario of encoded bitstream is...')
-        detected_scenario, video = scenario_detect(frequency, video, count)                              ## 'default', 'inverse', 'xor'
-        print('The scenario for encoding is... %s' % scenario_list[detected_scenario])                   ## MPEG2 H.263 H.264 H.265 IVC VP8 JPEG JPEG2000 BMP PNG TIFF
+        frequency_image = codec_decide(video, 'image')
+        frequency_video = codec_decide(video, 'video')
+        if frequency_video.index(max(frequency_video)) in [2, 3, 4, 10]:
+            frequency = frequency_video                                     # 면밀한 분류를 하는 것이 중요한 비디오 분류
+            # 2: H.264 정확도 보완
+            # 3, 10: H.265 정확도 보완
+            # 4: IVC 정확도 보완
+        elif frequency_image.index(max(frequency_image)) in [1, 6, 8]:
+            frequency = frequency_image                                     # 부족한 정보를 채우는 것이 중요한 이미지 분류
+            # 1: JPEG 정확도 보완
+            # 6: TIFF 정확도 보완
+            # 8: BMP 정확도 보완
+        else:
+            frequency = frequency_video
+            # JPEG 2000 보완, video 버전이 image 버전보다 상대적으로 정확하다
+        print(codec[frequency.index(max(frequency))])
+        print('testing what the scenario of encoded bitstream is...')
+        detected_scenario, video = scenario_detect(frequency, video, count)
+        # 'default', 'inverse', 'xor'
+        print('The scenario for encoding is... %s' % scenario_list[detected_scenario])
+        # MPEG2 H.263 H.264 H.265 IVC VP8 JPEG JPEG2000 BMP PNG TIFF
 
     if (len(sys.argv) != 2):
         print('입력 인자 오류')
