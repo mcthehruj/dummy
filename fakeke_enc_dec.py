@@ -439,36 +439,6 @@ elif goto == 3:                                                                 
     # IDR Frame: x26
 
 
-    if (cdx == 4):
-        i = 0
-        while i < len(stream):
-            if stream[i][3] == 0xAF or stream[i][3] == 0xB0 or stream[i][3] == 0xB1 or stream[i][3] == 0xB2 or stream[i][3] == 0xB3 or stream[i][3] == 0xB6 or stream[i][3] == 0xB7:  # 더미의 sps, pps, sei nalu 에는 히든의 데이터를 넣지 않았으므로 삭제처리
-                del stream[i]; i-=1
-            else:
-                i += 1
-
-    if (cdx == 3):
-        i = 0
-        while i < len(stream):
-            if stream[i][3] == 0x40 or stream[i][3] == 0x41 or stream[i][3] == 0x42 or stream[i][3] == 0x43 or stream[i][3] == 0x44 or stream[i][3] == 0x4E:  # 더미의 sps, pps, sei nalu 에는 히든의 데이터를 넣지 않았으므로 삭제처리
-                del stream[i]; i-=1
-            else:
-                i += 1
-    if (cdx == 2):
-        i = 0
-        while i < len(stream):
-            if stream[i][3] == 0x67 or stream[i][3] == 0x68 or stream[i][3] == 0x06:  # 더미의 sps, pps, sei nalu 에는 히든의 데이터를 넣지 않았으므로 삭제처리 (264만)
-                del stream[i]; i-=1
-            else:
-                i += 1
-    if (cdx == 0):
-        i = 0
-        while i < len(stream):
-            if stream[i][3] == 0xB3 or stream[i][3] == 0xB8:                           # 더미의 sps gop 삭제처리 (mpeg2)
-                del stream[i]; i-=1
-            else:
-                i += 1
-
 
     tta = len(stream);
 

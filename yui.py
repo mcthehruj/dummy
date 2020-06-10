@@ -53,7 +53,7 @@ class LoadDisplay(object):  #ui 영상창 클래스
         self.y = y
         self.f_width = 352
         self.f_height = 288
-        self.video_source = ""
+        self.video_source = ''
         self.move_x = 0
         self.move_y = 0
         self.zoom_x = 1
@@ -100,15 +100,28 @@ class LoadDisplay(object):  #ui 영상창 클래스
         frame = cv2.resize(self.frame, None, fx=self.zoom_x, fy=self.zoom_y, interpolation=cv2.INTER_LINEAR)
 
     def changevideo(self, src = ''):
+
+        def set_srctext_and_return(s):
+            srctext = os.path.basename(s)  # 파일이름 출력용
+            text = self.win.children['!text']
+            text.configure(state='normal')
+            text.delete(1.0, END)
+            text.insert(END, srctext)
+            text.tag_add('cen', 1.0, END)               #가운데정렬
+            text.tag_config('cen', justify='center')    #가운데정렬
+            text.configure(state='disabled')
+            return s
+
         LoadDisplay.pausedisplay = 1
         if src == '':
-            self.video_source = askopenfilename(initialdir="dataset/training_set/", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.")
-            if self.video_source == '': return  # ask 창 cancel 한 경우
+            tem = askopenfilename(initialdir="dataset/training_set/", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.")
+            if tem == '': return ''  # ask 창 cancel 한 경우
+            self.video_source = tem
         elif src == 'close':
             self.vid = cv2.VideoCapture('clod.png'); print('디스플레이 닫기,, 흰색디스플레이 하하')
             ret, self.frame = self.get_frame()
             self.vid.release()
-            return
+            return set_srctext_and_return('')
         else:
             self.video_source = src
 
@@ -135,13 +148,13 @@ class LoadDisplay(object):  #ui 영상창 클래스
                     time.sleep(0.01)
                     sli1.set(0)
                     sli2.set(0)
-                    return self.video_source
+                    return set_srctext_and_return(self.video_source)
                 else:                                           # imread로 열기 실패
                     if '.yuv' in self.video_source:
                         self.vid = VideoCaptureYUV(self.video_source, (288, 352))
                         ret, self.frame = self.vid.read()
                         print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "(debug) YUV 열기 완료, 이미지는 보이나 인코딩된 상태가 아니기 때문에 시나리오 적용 불가")
-                        return self.video_source
+                        return set_srctext_and_return(self.video_source)
                     else:
                         #print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "(debug) 무엇을 연것?")
                         self.vid = cv2.VideoCapture('errd2.png') ; print('오류디스플레이 출력')
@@ -151,7 +164,7 @@ class LoadDisplay(object):  #ui 영상창 클래스
                 print("error, file not exist in %s" % self.video_source)
                 ## 에러영상 메세지 디스플레이기능 넣기
                 self.video_source = ""
-                return
+                return set_srctext_and_return('')
 
         else:   # vid.isOpened True 일때:  영상 정보를 얻자
             ret, self.frame = self.get_frame()  # 동영상의 초기 1프레임 얻어 띄우기
@@ -179,7 +192,7 @@ class LoadDisplay(object):  #ui 영상창 클래스
         time.sleep(0.01)
         sli1.set(0)
         sli2.set(0)
-        return self.video_source
+        return set_srctext_and_return(self.video_source)
 
     def get_frame(self):
         if self.vid.isOpened():  # self.vid.set(cv2.CV_CAP_PROP_POS_FRAMES, frame_number - 1)
@@ -282,6 +295,7 @@ def print_dual(text, aa):
         for a in aa:
             print_dual_nocl(text, '%d, ' % (a))
         print_dual_nocl(text, ']\n')
+    text.see(END)
     text.update()
 def print_dual_nocl(text, aa):
     print(aa, end='')
@@ -302,6 +316,16 @@ def non_block_threding_popen(text, src, encoding='utf-8'):  ### 헉헉 겨우 �
         except:
             return                      # print("탈출");                            # 개거지같은 파이썬
 
+    def time_write():
+        now = datetime.now()
+        for n in range(2, 20):
+            tem = text.get('end-%dlines' % n, 'end-%dlines' % (n-1))
+            if tem == '': break
+            if tem[0] != '[':
+                text.insert('end-%dlines' % n, '[%d.%02d.%02d %d:%02d:%02d] ' % (now.year, now.month, now.day, now.hour, now.minute, now.second))
+
+
+
     p = subprocess.Popen(src, encoding=encoding, stdout=subprocess.PIPE)
     q = Queue()
     t = threading.Thread(target=enqueue_output, args=(p.stdout, q))
@@ -310,14 +334,18 @@ def non_block_threding_popen(text, src, encoding='utf-8'):  ### 헉헉 겨우 �
 
     while p.poll() is None:  # read line without blocking
         try:
-            line = q.get(timeout=.2)  # or q.get(timeout=.1)
+            line = q.get(timeout=.3)  # or q.get(timeout=.1)
         except:
-            window.update();   # print('no output yet')
+            time_write()
+            text.see(END)
+            window.update()    # print('no output yet')
         else:  # got line
             text.insert(END, line)
             continue
     time.sleep(0.01)
     p.stdout.close()                         # 개거지같은 파이썬
+    time_write()
+    text.see(END)
 
 
 #########################################################################################################
@@ -327,6 +355,7 @@ def non_block_threding_popen(text, src, encoding='utf-8'):  ### 헉헉 겨우 �
 
 def scenario_act(event):                    ### 변조과정 ###      각 연구실 작성 요망
     seq1 = vid1.video_source
+    if seq1 == '' and event.widget.current() != 9: print_dual(text_1_3, 'input stream을 지정해 주세요'); return
     src_plus_name = os.path.splitext(seq1)[0]           # 파일경로+파일이름
     ext           = os.path.splitext(seq1)[1]           # 확장자
     name          = os.path.basename(src_plus_name)     # 파일이름
@@ -452,7 +481,7 @@ def scenario_inv_act():                       ### 복조과정   시나리오별
         None            # 연구실별 복조 코드s here
 
     else:
-        print(catched_last1_line[:-2], "<- 이 마지막 메세지를 인식하지 못했기에 복조 시나리오로 넘어가지 못했습니다. 혹은 복조 프로세스 오류종료 하였음")  ##
+        print_dual(text_2_3, "%s <- 이 마지막 메세지를 인식하지 못했기에 복조 시나리오로 넘어가지 못했습니다. 혹은 복조 프로세스가 오류종료 하였음" % catched_last1_line[:-2])  ##
 
 
 
@@ -491,13 +520,14 @@ def sliderdrag(event):
 
 window = tkinter.Tk()
 window.title('UI test')
-window.geometry("900x700+200+200")
+window.iconbitmap('ho.ico')
+window.geometry("845x705+900+160")
 
 style = tkinter.ttk.Style()         # https://wiki.tcl-lang.org/page/List+of+ttk+Themes
 style.theme_create( "yummy", parent='winnative', settings={                   #커스텀 스타일을 만들어야만 탭배경색이 변경가능하데
-        "TNotebook": {"configure": {"tabmargins": [3, 4, 0, 0] } },
+        "TNotebook": {"configure": {"tabmargins": [7, 5, 0, 0] } },
         "TNotebook.Tab": {
-            "configure": {"padding": [11, 4], "background": '#cfdfc5' },#흰국방색
+            "configure": {"padding": [14, 5], "background": '#cfdfc5' },#흰국방색
             "map":       {"background": [("selected", '#FFFFFF')],      #흰색
                           "expand": [("selected", [1, 1, 1, 1])] } } } )
 style.theme_use("yummy")
@@ -507,7 +537,7 @@ tkinter.ttk.Style().configure("TNotebook", background='#536349')        #국방�
 # tkinter.ttk.Style().configure('TNotebook.Tab', padding=[11, 4], background='red',foreground='blue' )
 # tkinter.ttk.Style().map('TNotebook.Tab', background=[('selected', 'yellow')])
 
-notebook = tkinter.ttk.Notebook(window, width=900, height=600)
+notebook = tkinter.ttk.Notebook(window, width=845, height=670)
 notebook.pack()
 
 # Tap 1
@@ -528,15 +558,16 @@ yscrollbar.pack(side="right", fill="both")
 
 # text_1_1 = Text(Origin_labelframe_1, width=50, height=20)
 # text_1_2 = Text(Modified_labelframe_1, width=50, height=20)
-text_1_3 = Text(States_labelframe_1, width=120, height=10, wrap=NONE, yscrollcommand=yscrollbar.set)
-#
+text_1_3 = Text(States_labelframe_1, width=113, height=13, wrap=NONE, yscrollcommand=yscrollbar.set)
+
 # text_1_1.insert(tkinter.INSERT, '''Origin''')
 # text_1_2.insert(tkinter.INSERT, '''Modified''')
 text_1_3.insert(tkinter.INSERT, '''''')
-#
+
 # text_1_1.pack()
 # text_1_2.pack()
 text_1_3.pack()
+
 
 # Configure the scrollbars
 yscrollbar.config(command=text_1_3.yview)
@@ -567,7 +598,7 @@ yscrollbar.pack(side="right", fill="both")
 
 # text_2_1 = Text(Origin_labelframe_2, width=50, height=20)
 # text_2_2 = Text(Modified_labelframe_2, width=50, height=20)
-text_2_3 = Text(States_labelframe_2, width=120, height=10, wrap=NONE, yscrollcommand=yscrollbar.set)
+text_2_3 = Text(States_labelframe_2, width=113, height=13, wrap=NONE, yscrollcommand=yscrollbar.set)
 
 # text_2_1.insert(tkinter.INSERT, '''Modified''')
 # text_2_2.insert(tkinter.INSERT, '''Recovered''')
@@ -592,7 +623,7 @@ combo_1_2.bind("<<ComboboxSelected>>", scenario_act)
 combo_1_2.current(0)  # set the selected item
 
 # combo_1_1.place(x=150, y=0)
-combo_1_2.place(x=350, y=0)
+combo_1_2.place(x=150, y=10)
 
 sli2=DoubleVar(); slider_2 = Scale(frame2, from_=1, to=101, orient=HORIZONTAL, length=810, variable=sli2)
 slider_2.bind("<B1-Motion>", sliderdrag)
@@ -609,22 +640,22 @@ slider_2.pack()
 # btn_4 = tkinter.Button(window, text='recover', command=lambda: vid4.changevideo(), compound=LEFT)
 
 #text_1_1 = Text(frame1,width = 10,height=1 )
-btn_1_1 = tkinter.Button(frame1, text="input stream", command=lambda: vid2.changevideo('close') + vid1.changevideo())
+btn_1_1 = tkinter.Button(frame1, text="input stream", command=lambda: vid2.changevideo('close') or vid1.changevideo() or window.focus_force())
 #btn_1_2 = tkinter.Button(frame1, text="Encode", command=lambda: vid2.detect(text_1_3, combo_1_2.current()+1, codec_list.index(os.path.splitext(vid1.video_source)[1]), os.path.splitext(vid1.video_source)[0]))
 # vid2.detect(text_1_3)
 # vid2.detect(text_1_3, combo_1_2.current()+1, codec_list.index(os.path.splitext(vid1.video_source)[1]), os.path.splitext(vid1.video_source)[0])
 #detect.main(combo_1_2.current(),3,vid1.video_source)
 #text_2_1 = Text(frame2,width = 10,height=1 )
-btn_2_1 = tkinter.Button(frame2, text="restore stream", command=lambda: scenario_inv_act())
+btn_2_1 = tkinter.Button(frame2, text="restore stream", command=lambda: scenario_inv_act() or window.focus_force())   # 프로세스 종료되면 윈도우가 깜빡이도록 알람
 #btn_2_2 = tkinter.Button(frame2, text="Decode", command=lambda: vid4.detect_inv(text_2_3, os.path.splitext(vid3.video_source)))
 
 
 # button position
 #text_1_1.place(x = 110, y = 5)
-btn_1_1.place(x=0, y=0)
+btn_1_1.place(x=10, y=10)
 #btn_1_2.place(x=53, y=0)
 #text_2_1.place(x = 110, y = 5)
-btn_2_1.place(x=0, y=0)
+btn_2_1.place(x=10, y=10)
 #btn_2_2.place(x=53, y=0)
 # btn_1_2.place(x=0, y=350)
 # btn_2_2.place(x=0, y=350)
@@ -632,21 +663,50 @@ btn_2_1.place(x=0, y=0)
 # btn_2_3.place(x=30, y=350)
 
 # windows positions
-Origin_labelframe_1.place(x=0, y=30)
-Origin_labelframe_2.place(x=0, y=30)
-Modified_labelframe_1.place(x=450, y=30)
-Modified_labelframe_2.place(x=450, y=30)
-States_labelframe_1.place(x=0, y=450)
-States_labelframe_2.place(x=0, y=450)
+Origin_labelframe_1.place(x=10, y=50)
+Origin_labelframe_2.place(x=10, y=50)
+Modified_labelframe_1.place(x=460, y=50)
+Modified_labelframe_2.place(x=460, y=50)
+States_labelframe_1.place(x=10, y=450)
+States_labelframe_2.place(x=10, y=450)
 
-slider_1.place(x=0, y=400)
-slider_2.place(x=0, y=400)
+slider_1.place(x=10, y=400)
+slider_2.place(x=10, y=400)
 
 vid1 = LoadDisplay(Origin_labelframe_1, 0, 0)
 vid2 = LoadDisplay(Modified_labelframe_1, 0, 0)
 vid3 = LoadDisplay(Origin_labelframe_2, 0, 0)
 vid4 = LoadDisplay(Modified_labelframe_2, 0, 0)
 
+text_1_a = Text(Origin_labelframe_1, width=40, height=1)
+text_1_a.configure(background=window["bg"], border=0); text_1_a.pack()
+text_1_b = Text(Origin_labelframe_2, width=40, height=1);
+text_1_b.configure(background=window["bg"], border=0); text_1_b.pack()
+text_2_a = Text(Modified_labelframe_1, width=40, height=1);
+text_2_a.configure(background=window["bg"], border=0); text_2_a.pack()
+text_2_b = Text(Modified_labelframe_2, width=40, height=1);
+text_2_b.configure(background=window["bg"], border=0); text_2_b.pack()
+
+
+# class canvas_loding_class:
+#     def __init__(self, width, height, x, y):
+#         self.canvas_loadingimage = tkinter.Canvas(window, width=width, height=height, bg="yellow")
+#         self.canvas_loadingimage.place(x=x, y=y)
+#         self.vid = cv2.VideoCapture('load_lgreen.gif')
+#         self.update()
+#     def update(self):
+#         try: ret, self.temframe = self.vid.read()  # cv가 코덱모를경우 에러뿜음
+#         except: None
+#         if ret: return 2, cv2.cvtColor(self.temframe, cv2.COLOR_BGR2RGB)  # success
+#         else:
+#             self.vid = cv2.VideoCapture(self.video_source)  # opencv 이상한게 프레임 재생 할당량만 채우면 종료되버리네 ㄷ  bit은 오류날듯
+#             LoadDisplay.pausedisplay = 1
+#             return 3, None  # 시퀀스 끝 빈 프레임
+#         self.photo = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.temframe))
+#         self.canvas.create_image(self.move_x, self.move_y, image=self.photo, anchor=tkinter.NW)
+#         window.after(33, self.update)
+#
+# canvas_loading = canvas_loding_class(100, 100, 300, 300)
 
 for filename in glob("1t_youcandelete*"): os.remove(filename)
 window.mainloop()
