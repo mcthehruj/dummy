@@ -67,9 +67,8 @@ class LoadDisplay(object):  #ui 영상창 클래스
             pass  # raise ValueError("Unable", self.video_source)
         else:
             pass  # self.width = self.vid.get(cv2.CAP_PROP_FRAME_WIDTH)
-        self.canvas = tkinter.Canvas(self.win, width=self.f_width, height=self.f_height, bg="white")
-        self.canvas.place(x=x, y=y)
-        self.canvas.pack()
+        self.canvas = tkinter.Canvas(self.win, width=self.f_width, height=self.f_height,bg="white", bd=0, highlightthickness=0, relief='ridge')
+        self.canvas.pack(pady=(3,1),padx=(1,2))
 
         self.canvas.bind("<Button-1>", self.l_click)
         self.canvas.bind("<Button-3>", self.r_click)
@@ -110,6 +109,7 @@ class LoadDisplay(object):  #ui 영상창 클래스
             text.tag_add('cen', 1.0, END)               #가운데정렬
             text.tag_config('cen', justify='center')    #가운데정렬
             text.configure(state='disabled')
+            canvas_loading.forget()
             return s
 
         LoadDisplay.pausedisplay = 1
@@ -125,6 +125,7 @@ class LoadDisplay(object):  #ui 영상창 클래스
         else:
             self.video_source = src
 
+        canvas_loading.show()
         if self.vid.isOpened(): self.vid.release()           # 만약 클래스에 이전 영상이 열려있다면, 소멸처리
         self.vid = cv2.VideoCapture(self.video_source)
         self.name = os.path.splitext(self.video_source)[1]
@@ -148,6 +149,7 @@ class LoadDisplay(object):  #ui 영상창 클래스
                     time.sleep(0.01)
                     sli1.set(0)
                     sli2.set(0)
+                    canvas_loading.forget()
                     return set_srctext_and_return(self.video_source)
                 else:                                           # imread로 열기 실패
                     if '.yuv' in self.video_source:
@@ -317,15 +319,15 @@ def non_block_threding_popen(text, src, encoding='utf-8'):  ### 헉헉 겨우 �
             return                      # print("탈출");                            # 개거지같은 파이썬
 
     def time_write():
-        now = datetime.now()
         for n in range(2, 20):
             tem = text.get('end-%dlines' % n, 'end-%dlines' % (n-1))
             if tem == '': break
             if tem[0] != '[':
+                now = datetime.now()
                 text.insert('end-%dlines' % n, '[%d.%02d.%02d %d:%02d:%02d] ' % (now.year, now.month, now.day, now.hour, now.minute, now.second))
 
-
-
+    LoadDisplay.pausedisplay = 1
+    canvas_loading.show()
     p = subprocess.Popen(src, encoding=encoding, stdout=subprocess.PIPE)
     q = Queue()
     t = threading.Thread(target=enqueue_output, args=(p.stdout, q))
@@ -334,7 +336,7 @@ def non_block_threding_popen(text, src, encoding='utf-8'):  ### 헉헉 겨우 �
 
     while p.poll() is None:  # read line without blocking
         try:
-            line = q.get(timeout=.3)  # or q.get(timeout=.1)
+            line = q.get(timeout=.03)  # or q.get(timeout=.1)
         except:
             time_write()
             text.see(END)
@@ -346,6 +348,7 @@ def non_block_threding_popen(text, src, encoding='utf-8'):  ### 헉헉 겨우 �
     p.stdout.close()                         # 개거지같은 파이썬
     time_write()
     text.see(END)
+    canvas_loading.forget()
 
 
 #########################################################################################################
@@ -619,7 +622,7 @@ yscrollbar.config(command=text_2_3.yview)
 
 combo_1_2 = Combobox(frame1)
 combo_1_2['values'] = ("Scenario-1 inverse", "Scenario-2 xor", "Scenario-3 더미-히든", "Scenario-4", "Scenario-5", "Scenario-6", "Scenario-7", "Scenario-8", "Scenario-9", "Scenario-10 ipconfig예제")
-combo_1_2.bind("<<ComboboxSelected>>", scenario_act)
+combo_1_2.bind("<<ComboboxSelected>>", lambda event: canvas_loading.show() or scenario_act(event) or window.focus_force() or canvas_loading.forget())         # 함수 주소 전달인데 or이 먹히네...
 combo_1_2.current(0)  # set the selected item
 
 # combo_1_1.place(x=150, y=0)
@@ -640,13 +643,13 @@ slider_2.pack()
 # btn_4 = tkinter.Button(window, text='recover', command=lambda: vid4.changevideo(), compound=LEFT)
 
 #text_1_1 = Text(frame1,width = 10,height=1 )
-btn_1_1 = tkinter.Button(frame1, text="input stream", command=lambda: vid2.changevideo('close') or vid1.changevideo() or window.focus_force())
+btn_1_1 = tkinter.Button(frame1, text="input stream", command=lambda: vid1.changevideo() or vid2.changevideo('close'))
 #btn_1_2 = tkinter.Button(frame1, text="Encode", command=lambda: vid2.detect(text_1_3, combo_1_2.current()+1, codec_list.index(os.path.splitext(vid1.video_source)[1]), os.path.splitext(vid1.video_source)[0]))
 # vid2.detect(text_1_3)
 # vid2.detect(text_1_3, combo_1_2.current()+1, codec_list.index(os.path.splitext(vid1.video_source)[1]), os.path.splitext(vid1.video_source)[0])
 #detect.main(combo_1_2.current(),3,vid1.video_source)
 #text_2_1 = Text(frame2,width = 10,height=1 )
-btn_2_1 = tkinter.Button(frame2, text="restore stream", command=lambda: scenario_inv_act() or window.focus_force())   # 프로세스 종료되면 윈도우가 깜빡이도록 알람
+btn_2_1 = tkinter.Button(frame2, text="restore stream", command=lambda: scenario_inv_act() or window.focus_force() )   # 프로세스 종료되면 윈도우가 깜빡이도록 알람
 #btn_2_2 = tkinter.Button(frame2, text="Decode", command=lambda: vid4.detect_inv(text_2_3, os.path.splitext(vid3.video_source)))
 
 
@@ -688,25 +691,44 @@ text_2_b = Text(Modified_labelframe_2, width=40, height=1);
 text_2_b.configure(background=window["bg"], border=0); text_2_b.pack()
 
 
-# class canvas_loding_class:
-#     def __init__(self, width, height, x, y):
-#         self.canvas_loadingimage = tkinter.Canvas(window, width=width, height=height, bg="yellow")
-#         self.canvas_loadingimage.place(x=x, y=y)
-#         self.vid = cv2.VideoCapture('load_lgreen.gif')
-#         self.update()
-#     def update(self):
-#         try: ret, self.temframe = self.vid.read()  # cv가 코덱모를경우 에러뿜음
-#         except: None
-#         if ret: return 2, cv2.cvtColor(self.temframe, cv2.COLOR_BGR2RGB)  # success
-#         else:
-#             self.vid = cv2.VideoCapture(self.video_source)  # opencv 이상한게 프레임 재생 할당량만 채우면 종료되버리네 ㄷ  bit은 오류날듯
-#             LoadDisplay.pausedisplay = 1
-#             return 3, None  # 시퀀스 끝 빈 프레임
-#         self.photo = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.temframe))
-#         self.canvas.create_image(self.move_x, self.move_y, image=self.photo, anchor=tkinter.NW)
-#         window.after(33, self.update)
-#
-# canvas_loading = canvas_loding_class(100, 100, 300, 300)
+class canvas_loding_class:
+    def __init__(self, width, height, x, y, hide=1):
+        self.hide = hide
+        self.x = x
+        self.y = y
+        self.canvas_loadingimage = tkinter.Canvas(window, width=width, height=height, bg="yellow", bd=0, highlightthickness=0, relief='ridge')
+        self.canvas_loadingimage.place(x=x, y=y)
+        self.vid = cv2.VideoCapture('load_lgreen.gif')
+        ret, self.temframe = self.vid.read()
+        cv2.cvtColor(self.temframe, cv2.COLOR_BGR2RGB)
+        self.photo = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.temframe))
+        self.canvas_loadingimage.create_image(0, 0, image=self.photo, anchor=tkinter.NW)
+        self.forget()
+        self.update()
+    def update(self):
+        if self.hide == 1: None
+        else:
+            try:
+                ret, self.temframe = self.vid.read()  # cv가 코덱모를경우 에러뿜음
+                cv2.cvtColor(self.temframe, cv2.COLOR_BGR2RGB)
+            except:
+                self.vid = cv2.VideoCapture('load_lgreen.gif') # opencv 이상한게 프레임 재생 할당량만 채우면 종료되버리네 ㄷ  bit은 오류날듯
+                ret, self.temframe = self.vid.read()
+            self.photo = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.temframe))
+            self.canvas_loadingimage.create_image(0, 0, image=self.photo, anchor=tkinter.NW)
+        window.after(27, self.update)
+        #window.update()
+    def forget(self):
+        self.hide = 1
+        self.canvas_loadingimage.place_forget()
+        window.update()
+    def show(self):
+        self.hide = 0
+        self.canvas_loadingimage.place(x=self.x, y=self.y)
+        window.update()
+canvas_loading = canvas_loding_class(290, 290, 250, 200)
+
+
 
 for filename in glob("1t_youcandelete*"): os.remove(filename)
 window.mainloop()
