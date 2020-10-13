@@ -10,7 +10,8 @@ import PIL.ImageTk
 import cv2
 from utils import *
 
-
+#상민딥 네트워크 불러오는 과정 코드들 상민딥예측.py로 정리함
+"""
 def detect(text, scenario, index, name):  # 1이 반전, 2가 xor
     text = 0  # 안쓰는 변수
 
@@ -137,7 +138,7 @@ def print_dual_nocl(text, aa):
             print_dual_nocl(text, '%d, ' % (a))
         print_dual_nocl(text, ']\n')
     # text.update()
-
+"""
 
 ################ 메인함수
 if __name__ == "__main__":          #def sangmin_deep_predict(mode, src):

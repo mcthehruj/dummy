@@ -82,9 +82,10 @@ class BiLSTM_Attention(nn.Module):
     def __init__(self, n_hidden):
         super(BiLSTM_Attention, self).__init__()
 
-        self.embedding = nn.Embedding(vocab_size, embedding_dim)
-        self.lstm = nn.LSTM(embedding_dim, n_hidden, bidirectional=True)
-        self.out = nn.Linear(n_hidden * 2, num_classes)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.embedding = nn.Embedding(vocab_size, embedding_dim).to(device)
+        self.lstm = nn.LSTM(embedding_dim, n_hidden, bidirectional=True).to(device)
+        self.out = nn.Linear(n_hidden * 2, num_classes).to(device)
         self.n_hidden = n_hidden
 
         # lstm_output : [batch_size, n_step, n_hidden * num_directions(=2)], F matrix
@@ -105,13 +106,14 @@ class BiLSTM_Attention(nn.Module):
         return context, soft_attn_weights.data # context : [batch_size, n_hidden * num_directions(=2)]
 
     def forward(self, X):
-        input = self.embedding(X).cuda() # input : [batch_size, len_seq, embedding_dim]
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        input = self.embedding(X).to(device) # input : [batch_size, len_seq, embedding_dim]
         # print(input[ind])
         input = input.permute(1, 0, 2) # input : [len_seq, batch_size, embedding_dim]
 
-        hidden_state = Variable(torch.zeros(1*2, len(X), self.n_hidden)).cuda()
+        hidden_state = Variable(torch.zeros(1*2, len(X), self.n_hidden)).to(device)
         # [num_layers(=1) * num_directions(=2), batch_size, n_hidden]
-        cell_state = Variable(torch.zeros(1*2, len(X), self.n_hidden)).cuda()
+        cell_state = Variable(torch.zeros(1*2, len(X), self.n_hidden)).to(device)
         # [num_layers(=1) * num_directions(=2), batch_size, n_hidden]
 
         # final_hidden_state, final_cell_state : [num_layers(=1) * num_directions(=2), batch_size, n_hidden]
@@ -122,7 +124,7 @@ class BiLSTM_Attention(nn.Module):
         return self.out(attn_output), attention # model : [batch_size, num_classes], attention : [batch_size, n_step]
 
 
-def scenario_detect(frequency, video, count):
+def scenario_detect(frequency, video, count):           # 시나리오 디텍트 bin 변환부분에서 엄청오래걸리는듯 -정환
     if frequency.index(max(frequency)) == 0:                                                # MPEG2
         ssc = [hex2bin('000001b3')]                                                         # 스타트 코드들 저장
         sec = [hex2bin('000001b5')]
@@ -238,10 +240,11 @@ def codec_decide(video, mode='image'):
     model = BiLSTM_Attention(n_hidden)
     model.to(device)
     if mode == 'image':
-        a = torch.load(glob('Bi-LSTM_96.73.pth')[0])
+        a = torch.load(glob('Bi-LSTM_96.73.pth')[0], map_location=device)
     elif mode == 'video':
-        a = torch.load(glob('Bi-LSTM_97.94.pth')[0])
+        a = torch.load(glob('Bi-LSTM_97.94.pth')[0], map_location=device)
     model.load_state_dict(a)
+    model.to(device)
     frequency = [0] * num_classes       # MPEG-2, H.263, H.264,... 의 예측값의 빈도수를 각각 저장
     limit = (dataset - 1) * shift_bytes_in_a_sentence + all_bytes_in_a_sentence     # 학습시킨 데이터 길이만큼만 검증
     for i in range(limit):
@@ -623,7 +626,8 @@ def test(test_text, scenario, num_chars_in_a_word, model):
     test_text = test_text.replace(" ", "")
     test_text = split1to10(test_text, num_chars_in_a_word)
     tests = [np.asarray([word_dict[n] for n in test_text.split()])]
-    test_batch = Variable(torch.LongTensor(tests)).cuda()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    test_batch = Variable(torch.LongTensor(tests)).to(device)
     # Predict
     predict, _ = model(test_batch)
     predict = predict.data.max(1, keepdim=True)[1]

@@ -413,11 +413,11 @@ elif goto == 2:                                                                 
     reversed_stream = b''
     for i in range(len(stream)):
         reversed_stream = reversed_stream + stream[i][::-1]
-    if (cdx == 4): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_rev.bit', 'wb'); src = "ldecod_ivc.exe "            + os.path.splitext(sys.argv[1])[0] + "_rev.bit "              + os.path.splitext(sys.argv[1])[0] + "_rev.yuv"
-    if (cdx == 3): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_rev.hevc', 'wb'); src = "ffmpeg.exe -y -i "          + os.path.splitext(sys.argv[1])[0] + "_rev.hevc "              + os.path.splitext(sys.argv[1])[0] + "_rev.yuv"
-    if (cdx == 2): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_rev.264', 'wb'); src = "ldecod.exe -p InputFile="   + os.path.splitext(sys.argv[1])[0] + "_rev.264 -p OutputFile=" + os.path.splitext(sys.argv[1])[0] + "_rev.yuv"
-    if (cdx == 0): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_rev.m2v', 'wb'); src = "ffmpeg.exe -y -i "           + os.path.splitext(sys.argv[1])[0] + "_rev.m2v "               + os.path.splitext(sys.argv[1])[0] + "_rev.yuv"
-    if (cdx == 1): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_rev.h263','wb'); src = "ffmpeg.exe -y -i "           + os.path.splitext(sys.argv[1])[0] + "_rev.h263 "              + os.path.splitext(sys.argv[1])[0] + "_rev.yuv"
+    if (cdx == 4): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_restored.bit', 'wb'); src = "ldecod_ivc.exe "            + os.path.splitext(sys.argv[1])[0] + "_restored.bit "              + os.path.splitext(sys.argv[1])[0] + "_restored.yuv"
+    if (cdx == 3): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_restored.hevc', 'wb'); src = "ffmpeg.exe -y -i "          + os.path.splitext(sys.argv[1])[0] + "_restored.hevc "              + os.path.splitext(sys.argv[1])[0] + "_restored.yuv"
+    if (cdx == 2): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_restored.264', 'wb'); src = "ldecod.exe -p InputFile="   + os.path.splitext(sys.argv[1])[0] + "_restored.264 -p OutputFile=" + os.path.splitext(sys.argv[1])[0] + "_restored.yuv"
+    if (cdx == 0): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_restored.m2v', 'wb'); src = "ffmpeg.exe -y -i "           + os.path.splitext(sys.argv[1])[0] + "_restored.m2v "               + os.path.splitext(sys.argv[1])[0] + "_restored.yuv"
+    if (cdx == 1): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_restored.h263','wb'); src = "ffmpeg.exe -y -i "           + os.path.splitext(sys.argv[1])[0] + "_restored.h263 "              + os.path.splitext(sys.argv[1])[0] + "_restored.yuv"
 
     f_bin.write(reversed_stream)        # 히든 스트림 만드는것
     #subprocess.call(src)                # 디코딩해서 yuv만드는 것
