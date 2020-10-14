@@ -1,7 +1,8 @@
 import os, glob
+import winsound
 import threading
 import tkinter.messagebox
-from tkinter.filedialog import askopenfilename
+from tkinter.filedialog import askopenfilename, askopenfilenames
 from tkinter import *
 from tkinter.ttk import *
 import subprocess
@@ -355,64 +356,84 @@ def non_block_threding_popen(text, src, encoding='utf-8'):  ### 헉헉 겨우 �
 #########################################################################################################
 #########################################################################################################
 #########################################################################################################
+def srcs_g(a):
+    srcs_g.count = a
 
 def scenario_act(event):                    ### 변조과정 ###      각 연구실 작성 요망
-    seq1 = vid1.video_source
-    if seq1 == '' and event.widget.current() != 9: print_dual(text_1_3, 'input stream을 지정해 주세요'); return
-    src_plus_name = os.path.splitext(seq1)[0]           # 파일경로+파일이름
-    ext           = os.path.splitext(seq1)[1]           # 확장자
-    name          = os.path.basename(src_plus_name)     # 파일이름
+    if event == 'askmode' :
+        srcs_g.count = askopenfilenames(initialdir="dataset/training_set/", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.")
+        srcs = srcs_g.count
+        if len(srcs) == 0: return                                                       # 사용자가 ask 창을 캔슬 누른 경우 아웃
+        if len(srcs) == 1: vid1.changevideo(srcs[0]) ; return                           # 하나 선택한경우 보여주기만    하고 아웃
+        if len(srcs) >= 2:
+            print_dual(text_1_3, f'{len(srcs)}개의 입력 영상을 선택하였습니다.  ')
+            vid1.changevideo(srcs[0]); return                                           # 여러개 선택한 경우 개수만 프린트    하고 아웃
 
-    if event.widget.current() == 0:                              ## 시나리오1 inverse 변조
-        print_dual(text_1_3, 'inverse 변조 중입니다..')
-        bits_inv = bitstring.BitStream(~bitstring.Bits(filename=seq1))
-        bits_inv.tofile(open(src_plus_name + '_inv' + ext, 'wb'))   # 경로/seq.확장자 -> 경로/seq_inv.확장자
-        vid2.changevideo(src_plus_name + '_inv' + ext)
-        print_dual(text_1_3, '변조가 완료되었습니다.'); return
+    srcs = srcs_g.count
+    if len(srcs) == 0: return               # 입력영상을 아직 선택하지 않았을 경우 아웃
+    for iii, seq1 in enumerate(srcs):
+        if seq1 == '' and event.widget.current() != 9: print_dual(text_1_3, 'input stream을 지정해 주세요'); return
+        src_plus_name = os.path.splitext(seq1)[0]           # 파일경로+파일이름
+        ext           = os.path.splitext(seq1)[1]           # 확장자
+        name          = os.path.basename(src_plus_name)     # 파일이름
 
-    elif event.widget.current() == 1:                             ## 시나리오2 xor 변조
-        print_dual(text_1_3, 'xor 변조 중입니다..')
-        bitstream = bitstring.ConstBitStream(filename=seq1)
-        decstream = bitstream.read(bitstream.length).bin
-        count = factor(len(decstream))
-        decstream = xor_fast(decstream, count)
-        bitstream = bitstring.BitStream('0b' + decstream)
-        bitstream.tofile(open(src_plus_name + '_xor' + ext, 'wb'))  # 경로/seq.확장자 -> 경로/seq_xor.확장자
-        vid2.changevideo(src_plus_name + '_xor' + ext)
-        print_dual(text_1_3, '변조가 완료되었습니다.'); return
+        print_dual(text_1_3, f'({iii + 1}/{len(srcs)}) {name}{ext}')
+        vid1.changevideo(seq1)                              # 입력영상 띄우기
 
-    elif event.widget.current() == 2:                             ## 시나리오3 더미-히든 변조               현재 mpeg2,263,264,265,IVC 만 지원 됨
-        print_dual(text_1_3, '숨길 영상을 추가로 선택 해 주세요')
-        seq2 = askopenfilename(initialdir="", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.") # 더미-히든 변조과정에 필요한 추가시퀀스(히든) 열기
-        if seq2 == '': print_dual(text_1_3, '취소되었습니다'); return
-        print_dual(text_1_3, '더미-히든 변조 중입니다..')
-        non_block_threding_popen(text_1_3, "python.exe fakeke_enc_dec.py %s %s" % (seq1, seq2))                         # 더미-히든 시나리오 변조 실행
-        seq3 = os.path.splitext(seq1)[0] + '_' + os.path.basename(seq2)
-        vid2.changevideo(seq3) if os.path.isfile(seq3) else print_dual(text_1_3, '%s 존재하지 않음' % seq3)               # 더미-히든 실행 후 완료된 파일 vid2에 띄우기 ?.?.? 넣을까뺄까
-        print_dual(text_1_3, '변조가 완료되었습니다.'); return
+        if event.widget.current() == 0:                              ## 시나리오1 inverse 변조
+            print_dual(text_1_3, 'inverse 변조 중입니다..')
+            bits_inv = bitstring.BitStream(~bitstring.Bits(filename=seq1))
+            bits_inv.tofile(open(src_plus_name + '_inv' + ext, 'wb'))   # 경로/seq.확장자 -> 경로/seq_inv.확장자
+            vid2.changevideo(src_plus_name + '_inv' + ext)
+            print_dual(text_1_3, '변조가 완료되었습니다.');
 
-    elif event.widget.current() == 3:                             ## 시나리오4 장의선교수님연구실시나리오1
-        None    # 연구실별 변조 코드s here
+        elif event.widget.current() == 1:                             ## 시나리오2 xor 변조
+            print_dual(text_1_3, 'xor 변조 중입니다..')
+            bitstream = bitstring.ConstBitStream(filename=seq1)
+            decstream = bitstream.read(bitstream.length).bin
+            count = factor(len(decstream))
+            decstream = xor_fast(decstream, count)
+            bitstream = bitstring.BitStream('0b' + decstream)
+            bitstream.tofile(open(src_plus_name + '_xor' + ext, 'wb'))  # 경로/seq.확장자 -> 경로/seq_xor.확장자
+            vid2.changevideo(src_plus_name + '_xor' + ext)
+            print_dual(text_1_3, '변조가 완료되었습니다.');
 
-    elif event.widget.current() == 4:                             ## 시나리오5 장의선교수님연구실시나리오2
-        None    # 연구실별 변조 코드s here
+        elif event.widget.current() == 2:                             ## 시나리오3 더미-히든 변조               현재 mpeg2,263,264,265,IVC 만 지원 됨
+            print_dual(text_1_3, '숨길 영상을 추가로 선택 해 주세요')
+            seq2 = askopenfilename(initialdir="", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.") # 더미-히든 변조과정에 필요한 추가시퀀스(히든) 열기
+            if seq2 == '': print_dual(text_1_3, '취소되었습니다'); continue
+            print_dual(text_1_3, '더미-히든 변조 중입니다..')
+            non_block_threding_popen(text_1_3, "python.exe fakeke_enc_dec.py %s %s" % (seq1, seq2))                         # 더미-히든 시나리오 변조 실행
+            seq3 = os.path.splitext(seq1)[0] + '_' + os.path.basename(seq2)
+            vid2.changevideo(seq3) if os.path.isfile(seq3) else print_dual(text_1_3, '%s 존재하지 않음' % seq3)               # 더미-히든 실행 후 완료된 파일 vid2에 띄우기 ?.?.? 넣을까뺄까
+            print_dual(text_1_3, '변조가 완료되었습니다.');
 
-    elif event.widget.current() == 5:                             ## 시나리오6 장의선교수님연구실시나리오3
-        None    # 연구실별 변조 코드s here
+        elif event.widget.current() == 3:                             ## 시나리오4 장의선교수님연구실시나리오1
+            None    # 연구실별 변조 코드s here
 
-    elif event.widget.current() == 6:                             ## 시나리오7 김창수교수님연구실시나리오1
-        None    # 연구실별 변조 코드s here
+        elif event.widget.current() == 4:                             ## 시나리오5 장의선교수님연구실시나리오2
+            None    # 연구실별 변조 코드s here
 
-    elif event.widget.current() == 7:                             ## 시나리오8 김창수교수님연구실시나리오2
-        None    # 연구실별 변조 코드s here
+        elif event.widget.current() == 5:                             ## 시나리오6 장의선교수님연구실시나리오3
+            None    # 연구실별 변조 코드s here
 
-    elif event.widget.current() == 8:                             ## 시나리오9 김창수교수님연구실시나리오3
-        None    # 연구실별 변조 코드s here
+        elif event.widget.current() == 6:                             ## 시나리오7 김창수교수님연구실시나리오1
+            None    # 연구실별 변조 코드s here
+
+        elif event.widget.current() == 7:                             ## 시나리오8 김창수교수님연구실시나리오2
+            None    # 연구실별 변조 코드s here
+
+        elif event.widget.current() == 8:                             ## 시나리오9 김창수교수님연구실시나리오3
+            None    # 연구실별 변조 코드s here
 
 
-    elif event.widget.current() == 9:                             ## 시나리오10 예제   각 연구실에서 만든 win32 어플리케이션(혹은.py)을 불러옵니다.
-        non_block_threding_popen(text_1_3, ["ipconfig"], encoding='cp949')
+        elif event.widget.current() == 9:                             ## 시나리오10 예제   각 연구실에서 만든 win32 어플리케이션(혹은.py)을 불러옵니다.
+            non_block_threding_popen(text_1_3, ["ipconfig"], encoding='cp949')
 
+        print_dual(text_1_3, "　")
+        window.focus_force()
+        winsound.PlaySound('SystemQuestion', winsound.SND_ALIAS)        # 사운드에 딜레이가 함께 있다.. ㄷㄷ
+        #time.sleep(0.5)
 
 #########################################################################################################
 #########################################################################################################
@@ -420,71 +441,86 @@ def scenario_act(event):                    ### 변조과정 ###      각 연구
 # 1. 어떤 시나리오가 적용되어있는지 판단
 # 2. 판단된 시나리오로 각 연구실의 복조과정 실행
 def scenario_inv_act():                       ### 복조과정   시나리오별로 각 연구실에서 작성한 win32어플리케이션을 인자전달해서 복조 하도록 해주세요
-    seq1 = vid3.changevideo();   # 영상 ask창으로 불러오기
-    if seq1 == '': return                            # 사용자가 ask 창을 캔슬 누른 경우 아웃
-    vid4.changevideo('close');
-    src_plus_name = os.path.splitext(seq1)[0]           # 파일경로+파일이름
-    ext           = os.path.splitext(seq1)[1]           # 확장자
-    name          = os.path.basename(src_plus_name)     # 파일이름
+    srcs = askopenfilenames(initialdir="dataset/training_set/", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.")
+    if srcs == '': return  # 사용자가 ask 창을 캔슬 누른 경우 아웃
 
-    ####################################### 1.  판단 과정
-    print_dual(text_2_3, '1. 시나리오 적용여부 판단 중입니다..')
+    for iii, seq1 in enumerate(srcs):
+        src_plus_name = os.path.splitext(seq1)[0]           # 파일경로+파일이름
+        ext           = os.path.splitext(seq1)[1]           # 확장자
+        name          = os.path.basename(src_plus_name)     # 파일이름
 
-    non_block_threding_popen(text_2_3, "python.exe fakeke_enc_dec.py %s" % seq1)            # 1.1 더미-히든 판별모드 실행 (임시 하드코딩)
-    if 'hidden' in text_2_3.get('end-2lines', END): None                                    # 더미-히든시나리오로 판단됐다면 상민딥 안돌리고 통과
-    else: non_block_threding_popen(text_2_3, "python.exe 상민딥예측.py %s" % seq1)            # 1.2 더미-히든 아닐경우 상민딥 돌림
-                                                                                            #     MPEG2 H.263 H.264 H.265 IVC VP8 JPEG JPEG2000 BMP PNG TIFF 코덱과
-                                                                                            #     'default', 'inverse', 'xor' 시나리오에 대해 판별함
-    catched_last1_line = text_2_3.get('end-2lines', END)
-    ####################################### 2.  복조 과정                                    # 복조과정      각 연구실별 작성 요망
-    print_dual(text_2_3, '2. 시나리오 복조를 시작합니다.')
-    if 'default' in catched_last1_line:                     #시나리오 적용 안된 경우
-        print_dual(text_2_3, '변조된 내역이 없습니다.'); return
+        print_dual(text_2_3, f'({iii + 1}/{len(srcs)}) {name}{ext}')
+        vid3.changevideo(seq1)   # 입력영상 띄우기
 
-    elif 'inverse' in catched_last1_line:                   #시나리오 1 inverse 복조
-        print_dual(text_2_3, 'inverse 복조 중입니다..')
-        bits_inv = bitstring.BitStream(~bitstring.Bits(filename=seq1))
-        bits_inv.tofile(open(src_plus_name + '_restored' + ext, 'wb'))
-        vid4.changevideo(src_plus_name + '_restored' + ext)
-        print_dual(text_2_3, '복조가 완료되었습니다.'); return
+        #vid4.changevideo('close');
 
-    elif 'xor' in catched_last1_line:                       #시나리오 2 xor 복조
-        print_dual(text_2_3, 'xor 복조 중입니다..')
-        bitstream = bitstring.ConstBitStream(filename=seq1)
-        decstream = bitstream.read(bitstream.length).bin
-        count = factor(len(decstream))
-        decstream = dxor_fast(decstream, count)
-        bitstream = bitstring.BitStream('0b' + decstream)
-        bitstream.tofile(open(src_plus_name + '_restored' + ext, 'wb'))
-        vid4.changevideo(src_plus_name + '_restored' + ext)
-        print_dual(text_2_3, '복조가 완료되었습니다.'); return
 
-    elif 'dummy-hidden.' in catched_last1_line:             #시나리오 3     # 더미-히든 복조
-        print_dual(text_2_3, "dummy-hidden restore start")
-        non_block_threding_popen(text_2_3, "python.exe fakeke_enc_dec.py %s %s" % (seq1, '1'))    # 더미-히든 시나리오 복조모드 실행
-        vid4.changevideo(src_plus_name + '_restored' + ext)          # 복조된 _restored 파일 디스플레이
-        print_dual(text_2_3, "dummy-hidden restore complete") ; return
+        #######################################                                            # 1.  판단 과정
+        print_dual(text_2_3, '1. 시나리오 적용여부 판단 중입니다..')
 
-    elif '장의선교수님연구실시나리오1' in catched_last1_line:    #시나리오 4
-        None            # 연구실별 복조 코드s here
+        non_block_threding_popen(text_2_3, "python.exe fakeke_enc_dec.py %s" % seq1)            # 1.1 더미-히든 판별모드 실행 (임시 하드코딩)
+        if 'hidden' in text_2_3.get('end-2lines', END): None                                    # 더미-히든시나리오로 판단됐다면 상민딥 안돌리고 통과
+        else: non_block_threding_popen(text_2_3, "python.exe 상민딥예측.py %s" % seq1)            # 1.2 더미-히든 아닐경우 상민딥 돌림
+                                                                                                #     MPEG2 H.263 H.264 H.265 IVC VP8 JPEG JPEG2000 BMP PNG TIFF 코덱과
+                                                                                                #     'default', 'inverse', 'xor' 시나리오에 대해 판별함
+        catched_last1_line = text_2_3.get('end-2lines', END)
 
-    elif '장의선교수님연구실시나리오2' in catched_last1_line:    #시나리오 5
-        None            # 연구실별 복조 코드s here
 
-    elif '장의선교수님연구실시나리오3' in catched_last1_line:    #시나리오 6
-        None            # 연구실별 복조 코드s here
 
-    elif '김창수교수님연구실시나리오1' in catched_last1_line:    #시나리오 7
-        None            # 연구실별 복조 코드s here
 
-    elif '김창수교수님연구실시나리오2' in catched_last1_line:    #시나리오 8
-        None            # 연구실별 복조 코드s here
+        #######################################                                            # 2.  복조 과정
+        print_dual(text_2_3, '2. 시나리오 복조를 시작합니다.')                                       # 각 연구실별 작성 요망
+        if 'default' in catched_last1_line:                     #시나리오 적용 안된 경우
+            print_dual(text_2_3, '변조된 내역이 없습니다.')
 
-    elif '김창수교수님연구실시나리오3' in catched_last1_line:    #시나리오 9
-        None            # 연구실별 복조 코드s here
+        elif 'inverse' in catched_last1_line:                   #시나리오 1 inverse 복조
+            print_dual(text_2_3, 'inverse 복조 중입니다..')
+            bits_inv = bitstring.BitStream(~bitstring.Bits(filename=seq1))
+            bits_inv.tofile(open(src_plus_name + '_restored' + ext, 'wb'))
+            vid4.changevideo(src_plus_name + '_restored' + ext)
+            print_dual(text_2_3, '복조가 완료되었습니다.')
 
-    else:
-        print_dual(text_2_3, "%s <- 이 마지막 메세지를 인식하지 못했기에 복조 시나리오로 넘어가지 못했습니다. 혹은 복조 프로세스가 오류종료 하였음" % catched_last1_line[:-2])  ##
+        elif 'xor' in catched_last1_line:                       #시나리오 2 xor 복조
+            print_dual(text_2_3, 'xor 복조 중입니다..')
+            bitstream = bitstring.ConstBitStream(filename=seq1)
+            decstream = bitstream.read(bitstream.length).bin
+            count = factor(len(decstream))
+            decstream = dxor_fast(decstream, count)
+            bitstream = bitstring.BitStream('0b' + decstream)
+            bitstream.tofile(open(src_plus_name + '_restored' + ext, 'wb'))
+            vid4.changevideo(src_plus_name + '_restored' + ext)
+            print_dual(text_2_3, '복조가 완료되었습니다.')
+
+        elif 'dummy-hidden.' in catched_last1_line:             #시나리오 3     # 더미-히든 복조
+            print_dual(text_2_3, "dummy-hidden restore start")
+            non_block_threding_popen(text_2_3, "python.exe fakeke_enc_dec.py %s %s" % (seq1, '1'))    # 더미-히든 시나리오 복조모드 실행
+            vid4.changevideo(src_plus_name + '_restored' + ext)          # 복조된 _restored 파일 디스플레이
+            print_dual(text_2_3, "dummy-hidden restore complete")
+
+        elif '장의선교수님연구실시나리오1' in catched_last1_line:    #시나리오 4
+            None            # 연구실별 복조 코드s here
+
+        elif '장의선교수님연구실시나리오2' in catched_last1_line:    #시나리오 5
+            None            # 연구실별 복조 코드s here
+
+        elif '장의선교수님연구실시나리오3' in catched_last1_line:    #시나리오 6
+            None            # 연구실별 복조 코드s here
+
+        elif '김창수교수님연구실시나리오1' in catched_last1_line:    #시나리오 7
+            None            # 연구실별 복조 코드s here
+
+        elif '김창수교수님연구실시나리오2' in catched_last1_line:    #시나리오 8
+            None            # 연구실별 복조 코드s here
+
+        elif '김창수교수님연구실시나리오3' in catched_last1_line:    #시나리오 9
+            None            # 연구실별 복조 코드s here
+
+        else:
+            print_dual(text_2_3, "%s <- 이 마지막 메세지를 인식하지 못했기에 복조 시나리오로 넘어가지 못했습니다. 혹은 복조 프로세스가 오류종료 하였음" % catched_last1_line[:-2])  ##
+        print_dual(text_2_3, "　")
+        window.focus_force()
+        winsound.PlaySound('SystemQuestion', winsound.SND_ALIAS)
+        time.sleep(0.2)
 
 
 
@@ -643,7 +679,7 @@ slider_2.pack()
 # btn_4 = tkinter.Button(window, text='recover', command=lambda: vid4.changevideo(), compound=LEFT)
 
 #text_1_1 = Text(frame1,width = 10,height=1 )
-btn_1_1 = tkinter.Button(frame1, text="input stream", command=lambda: vid1.changevideo() or vid2.changevideo('close'))
+btn_1_1 = tkinter.Button(frame1, text="input stream", command=lambda: scenario_act('askmode') or vid2.changevideo('close'))
 #btn_1_2 = tkinter.Button(frame1, text="Encode", command=lambda: vid2.detect(text_1_3, combo_1_2.current()+1, codec_list.index(os.path.splitext(vid1.video_source)[1]), os.path.splitext(vid1.video_source)[0]))
 # vid2.detect(text_1_3)
 # vid2.detect(text_1_3, combo_1_2.current()+1, codec_list.index(os.path.splitext(vid1.video_source)[1]), os.path.splitext(vid1.video_source)[0])
@@ -731,6 +767,8 @@ canvas_loading = canvas_loding_class(290, 290, 250, 200)
 
 
 for filename in glob("1t_youcandelete*"): os.remove(filename)
+srcs_g('')  # 전역변수 초기화
+
 window.mainloop()
 for filename in glob("1t_youcandelete*"): os.remove(filename)
 

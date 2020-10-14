@@ -199,29 +199,47 @@ def scenario_detect(frequency, video, count):           # 시나리오 디텍트
     video = video.read(video.length).bin
     hh = [hr, hx]                                                               # 더미 헤더 카운트 추가
     condition = [True, True]                                                    # 더미 헤더 카운트 추가
+
+
+
     for h in range(len(hh)):
         for l in range(all):
-            if hh[h][l] == 0:
+            #if hh[h][l] == 0:                                  # 등록된 ssc sec gop psc 중 0검출이 하나라도 있으면 해당 코덱을 제외해야하는가?
+            if sum(hh[h]) == 0:                                 # 모두 0 이어야 제외하도록 바꿔봄
                 condition[h] = False
             # """
             if codec[frequency.index(max(frequency))] == 'H.263' and hh[h][1] >= 10:    # 헤더의 수가 너무 많으면 믿지 않는다
+                print('so many break', f' (inv{hh[0]} vs xor{hh[1]})')
                 condition[h] = False
             if codec[frequency.index(max(frequency))] == 'TIFF' and hh[h][0] != 1:      # 헤더의 수가 너무 많으면 믿지 않는다
+                print('TIFF !=1 break', f' (inv{hh[0]} vs xor{hh[1]})')
                 condition[h] = False
             # """
-        if condition[h]:
-            detected_scenario = h + 1
-            print('# of %s headers ->' % scenario_list[detected_scenario], hh[h])
-            if detected_scenario == 1:
-                video = encode(video, 'inv')
-            elif detected_scenario == 2:
-                video = dxor_fast(video, count)
-            return detected_scenario, video
+
+    if sum(condition)==2:                           # 1차로 대충 걸른 후에도 둘다 참이라면 대소비교를 하자
+        if hr < hx:
+            condition[0] = False
         else:
-            continue
-    print('Unknown scenario or codec mismatched!')
+            condition[1] = False
+
+    if sum(condition)==1:                           # 하나 남는다면 확정처리
+        if condition[0]==1: detected_scenario = 1
+        if condition[1]==1: detected_scenario = 2
+        #print('# of %s headers ->' % scenario_list[detected_scenario], hh[h])
+        print(scenario_list[detected_scenario], f'found (inv{hh[0]} vs xor{hh[1]})' )
+        if detected_scenario == 1:
+            video = encode(video, 'inv')
+        elif detected_scenario == 2:
+            video = dxor_fast(video, count)
+        return detected_scenario, video
+
+    # 둘 다 탈락한 경우 렛미트라이로
+    print('Unknown scenario or codec mismatched!' , f' (inv{hh[0]} vs xor{hh[1]})' )
     print('Let me try the second best prediction!')
-    frequency[frequency.index(max(frequency))] = 0
+    frequency[frequency.index(max(frequency))] -= 100
+    if max(frequency) < -99:
+        print('판별실패!')
+        return   # 모든 코덱 감점먹고 가망없으면 종료
     print(codec[frequency.index(max(frequency))])
     video = bitstring.BitStream('0b' + video)
     detected_scenario, video = scenario_detect(frequency, video, count)
@@ -279,11 +297,10 @@ def xor_header(header_list, xor_flag=1):                                # 원래
                     header_list_[i].append(new)
     return header_list_
 
-
+"""
 def scenario_search(video, header_list):
     frequency_header = [0] * len(header_list)
-    time_scale = int(math.pow(10, 2)) // 2
-    # 1일때 모든 비트스트림을 다 본다. 시간이 너무 길게 걸리므로 이 값을 늘리면서 실험하는 것을 추천.
+    time_scale = int(math.pow(10, 2)) // 2              # 1일때 모든 비트스트림을 다 본다. 시간이 너무 길게 걸리므로 이 값을 늘리면서 실험하는 것을 추천.
     limit = (len(video) - len(header_list[0][0])) // time_scale
     for video.pos in range(limit):
         for k in range(len(header_list)):
@@ -293,6 +310,26 @@ def scenario_search(video, header_list):
             if code in header_list[k]:
                 frequency_header[k] += 1
     return frequency_header
+"""
+def scenario_search(video, header_list):
+    frequency_header = [0] * len(header_list)
+    time_scale = 30  # 1일때 모든 비트스트림을 다 본다. 시간이 너무 길게 걸리므로 이 값을 늘리면서 실험하는 것을 추천.
+    limit = len(video) // time_scale
+    if limit < 5000:   limit = 5000           # 하한
+    if limit > 60000: limit = 60000           # 상한   120000 정도가 적당한거 같은데 느리니까 60000
+    bin_header_list = []
+    for aa in header_list:
+        if len(header_list[0])==1: bin_header_list.append( [bitstring.BitStream(bin=bb) for bb in aa] )  # inv의 경우
+        if len(header_list[0])==2: bin_header_list.append( [bitstring.BitStream(bin=bb) for bb in aa] )  # xor처럼 쌍으로 이루어진 경우
+
+    for ii in range(0, limit, 8):
+        video.pos = ii
+        for k in range(len(bin_header_list)):               # 헤더리스트 포문
+            if bin_header_list[k] == []: continue
+            for kk in range(len(bin_header_list[k])):          # 헤더리스트 쌍 포문
+                if video.peek(len(bin_header_list[k][kk])) == bin_header_list[k][kk] : frequency_header[k] += 1
+    return frequency_header
+
 
 
 def factor(n):
