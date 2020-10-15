@@ -318,16 +318,15 @@ def scenario_search(video, header_list):
     if limit < 5000:   limit = 5000           # 하한
     if limit > 60000: limit = 60000           # 상한   120000 정도가 적당한거 같은데 느리니까 60000
     bin_header_list = []
-    for aa in header_list:
-        if len(header_list[0])==1: bin_header_list.append( [bitstring.BitStream(bin=bb) for bb in aa] )  # inv의 경우
-        if len(header_list[0])==2: bin_header_list.append( [bitstring.BitStream(bin=bb) for bb in aa] )  # xor처럼 쌍으로 이루어진 경우
+    for aa in header_list:                                                      # nalu에 여러개를 등록한 경우 ssc sec ...4개(aa)를 돌며 ..
+        bin_header_list.append( [bitstring.BitStream(bin=bb) for bb in aa] )    # bb개
 
     for ii in range(0, limit, 8):
-        video.pos = ii
-        for k in range(len(bin_header_list)):               # 헤더리스트 포문
+        video.pos = ii                                              # 비트위치 ii
+        for k in range(len(bin_header_list)):                       # 헤더리스트 4개 포문
             if bin_header_list[k] == []: continue
-            for kk in range(len(bin_header_list[k])):          # 헤더리스트 쌍 포문
-                if video.peek(len(bin_header_list[k][kk])) == bin_header_list[k][kk] : frequency_header[k] += 1
+            for kk in range(len(bin_header_list[k])):               # nalu 쌍들 여러개일때 포문
+                if video.peek(len(bin_header_list[k][kk])) == bin_header_list[k][kk]: frequency_header[k] += 1
     return frequency_header
 
 

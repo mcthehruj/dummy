@@ -35,8 +35,8 @@ from os.path import basename
 def codecdecision(seq):
     # 각 코덱의 스타트코드 특징 count
     d0 = b'(\x00\x00\x01[\xB0-\xB8|\x03-\x11])'                                                 # mpeg2
-    d1 = b'(\x00\x00[\x80-\x8F])'                                                               # 263
-    d1_ex = b'(\x80\x00\x00[\x80-\x8F])'                                                        # 263 뒤집혔을때 잘못된 start code 제외
+    d1 = b'(\x00\x00[\x80-\x83])'                                                               # 263
+    d1_ex = b'(\x80\x00\x00[\x80-\x83])'                                                        # 263 뒤집혔을때 잘못된 start code 제외
     d2 = b'(\x00\x00\x01[\x68|\x67|\x65|\x61|\x41|\x21|\x01])'                                  # 264
     d3 = b'(\x00\x00\x01[\x40|\x41|\x42|\x43|\x44|\x4E|\x26|\x28|\x00|\x02|\x2A|\x10|\x12])'    # hevc 40, 41: VPS, 42, 43: SPS, 44: PPS, 4E: SEI, 26: IDR Frame, 뭔지 모르는 2A, 10 12 추가함
     d3_ex = b'(\x00\x00\x01\x00[\x1F|\x80|\x00])'                                               # IVC와 중복성 제거
@@ -55,7 +55,7 @@ def codecdecision(seq):
 
     # 실제 사용할 start code 별로 seq split
     d0 = b'(\x00\x00\x01[\xB0-\xB5])'                                                           # mpeg2
-    d1 = b'(\x00\x00[\x80-\x8F])'                                                               # 263
+    d1 = b'(\x00\x00[\x80-\x83])'                                                               # 263
     d2 = b'(\x00\x00\x01[\x68|\x67|\x65|\x61|\x41|\x21|\x01])'                                  # 264
     d3 = b'(\x00\x00\x01[\x40|\x41|\x42|\x43|\x44|\x4E|\x26|\x28|\x00|\x02|\x2A|\x10|\x12])'    # hevc
     d4 = b'(\x00\x00\x01[\x00|\xAF|\xB0|\xB1|\xB2|\xB3|\xB6|\xB7])'                             # ICV
@@ -501,8 +501,8 @@ elif goto == 3:                                                                 
 
     ttb = 0
     d0 = b'(\x00\x00\x01[\xB0-\xB5])'  # mpeg2
-    d1 = b'(\x00\x00[\x80-\x8F])'  # 263
-    d1_ex = b'(\x80\x00\x00[\x80-\x8F])'
+    d1 = b'(\x00\x00[\x80-\x83])'  # 263
+    d1_ex = b'(\x80\x00\x00[\x80-\x83])'
     d2 = b'(\x00\x00\x01[\x68|\x67|\x65|\x61|\x41|\x21|\x01])'  # 264
     d3 = b'(\x00\x00\x01[\x40|\x41|\x42|\x43|\x44|\x4E|\x26|\x28|\x00|\x02|\x2A|\x10|\x12])'  # hevc 40, 41: VPS, 42, 43: SPS, 44: PPS, 4E: SEI, 26: IDR Frame
     d3_ex = b'(\x00\x00\x01\x00[\x1F|\x01|\x80|\x00])'
