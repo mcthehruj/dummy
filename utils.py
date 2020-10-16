@@ -209,10 +209,10 @@ def scenario_detect(frequency, video, count):           # 시나리오 디텍트
                 condition[h] = False
             # """
             if codec[frequency.index(max(frequency))] == 'H.263' and hh[h][1] >= 10:    # 헤더의 수가 너무 많으면 믿지 않는다
-                print('so many break', f' (inv{hh[0]} vs xor{hh[1]})')
+                print('so many break >= 10', f' (inv{hh[0]} vs xor{hh[1]})')
                 condition[h] = False
-            if codec[frequency.index(max(frequency))] == 'TIFF' and hh[h][0] != 1:      # 헤더의 수가 너무 많으면 믿지 않는다
-                print('TIFF !=1 break', f' (inv{hh[0]} vs xor{hh[1]})')
+            if codec[frequency.index(max(frequency))] == 'TIFF' and hh[h][0] >= 5:      # 헤더의 수가 너무 많으면 믿지 않는다
+                print('so many break >= 5', f' (inv{hh[0]} vs xor{hh[1]})')
                 condition[h] = False
             # """
 
@@ -228,9 +228,9 @@ def scenario_detect(frequency, video, count):           # 시나리오 디텍트
         #print('# of %s headers ->' % scenario_list[detected_scenario], hh[h])
         print(scenario_list[detected_scenario], f'found (inv{hh[0]} vs xor{hh[1]})' )
         if detected_scenario == 1:
-            video = encode(video, 'inv')
+            None#video = encode(video, 'inv')
         elif detected_scenario == 2:
-            video = dxor_fast(video, count)
+            None#video = dxor_fast(video, count)             # ui에서 복호화 하자
         return detected_scenario, video
 
     # 둘 다 탈락한 경우 렛미트라이로
@@ -314,19 +314,23 @@ def scenario_search(video, header_list):
 def scenario_search(video, header_list):
     frequency_header = [0] * len(header_list)
     time_scale = 30  # 1일때 모든 비트스트림을 다 본다. 시간이 너무 길게 걸리므로 이 값을 늘리면서 실험하는 것을 추천.
+
+    video = video.bin       # binstring read로 읽어오게되면 bit 개수만큼 파일리드를 그제서야 돌려서 엄청오래걸리는듯,, bin str으로 처리하는게 빠름
+
     limit = len(video) // time_scale
     if limit < 5000:   limit = 5000           # 하한
     if limit > 60000: limit = 60000           # 상한   120000 정도가 적당한거 같은데 느리니까 60000
-    bin_header_list = []
-    for aa in header_list:                                                      # nalu에 여러개를 등록한 경우 ssc sec ...4개(aa)를 돌며 ..
-        bin_header_list.append( [bitstring.BitStream(bin=bb) for bb in aa] )    # bb개
+    bin_header_list = header_list
+    #for aa in header_list:                                                      # nalu에 여러개를 등록한 경우 ssc sec ...4개(aa)를 돌며 ..
+    #    bin_header_list.append( [bitstring.BitStream(bin=bb) for bb in aa] )    # bb개
 
     for ii in range(0, limit, 8):
-        video.pos = ii                                              # 비트위치 ii
-        for k in range(len(bin_header_list)):                       # 헤더리스트 4개 포문
+        #video.pos = ii                                              # 비트위치 ii
+        for k in range(len(bin_header_list)):                       # 헤더리스트 4개에 대한 포문
             if bin_header_list[k] == []: continue
-            for kk in range(len(bin_header_list[k])):               # nalu 쌍들 여러개일때 포문
-                if video.peek(len(bin_header_list[k][kk])) == bin_header_list[k][kk]: frequency_header[k] += 1
+            for kk in range(len(bin_header_list[k])):               # nalu 쌍들 여러개에 대한 포문
+                if video[ii:ii+len(bin_header_list[k][kk])] == bin_header_list[k][kk]: frequency_header[k] += 1
+                #if video[ii:].startswith(bin_header_list[k][kk]): frequency_header[k] += 1                                  # startswith 왜이렇게 느린가... 100배 차이남
     return frequency_header
 
 
@@ -448,6 +452,112 @@ def xor_fast(string, part=1):
 def dxor_fast(string, part=1):
     return decode_all(string, 'xor', part)
 
+
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+# 2메가 영상 xor 복조하는데 5분이 걸려서 비트스트림버전으로 변경
+
+def xor_fast_bitstream(stream, none=0, flag=0):
+    if type(stream) is str: stream = bitstring.BitStream(bin=stream); flag=1      #상민 xor과의 호환성을위해  bin스트링도 입력받고 binarystream도 가능
+    result = bytes()
+    part = len(stream)
+    for ii in range(0, part-32, 32):            # 32배수로 돈다
+        a = stream.peek('uint:32')
+        stream.pos += 1
+        b = stream.peek('uint:32')
+        stream.pos += 31
+        c = (a^b).to_bytes(4, byteorder='big')
+        result += c
+    remain = part - stream.pos                  # 32미만으로 남았을때
+    remain_b = remain // 8                      #
+    remain_b += bool(remain % 8)                # 올림처리 위해
+    a = stream.peek(f'uint:{remain}')
+    if remain == 1: b = 0                       # 1bit 남은 경우 읽을 bit이 0이라 오류나네
+    else:
+        stream.pos += 1
+        b = stream.peek(f'uint:{remain-1}') << 1    # 마지막 1개는 0 채운다
+    c = ((a^b)<<(-remain)%8).to_bytes(remain_b, byteorder='big')
+    result += c
+    return bitstring.BitStream(result).bin if flag == 1 else result
+
+    """    if type(stream) is str: stream = bitstring.BitStream(bin=stream); flag=1      #상민 xor과의 호환성을위해  bin스트링도 입력받고 binarystream도 가능
+    result = bytes()
+    part = len(stream)
+    stream1 = stream.bin
+    stream2 = stream.bin[1:]
+    for ii in range(0, part-32, 32):            # 32배수로 돈다
+        a = int(stream1[ii:ii+32], base=2)
+        b = int(stream2[ii:ii+32], base=2)
+        c = (a^b).to_bytes(4, byteorder='big')
+        result += c
+    remain = part - ii                          # 32미만으로 남았을때
+    remain_b = remain // 8                      #
+    remain_b += bool(remain % 8)                # 올림처리 위해
+    a = int(stream1[ii:ii+remain], base=2)
+    if remain == 1: b = 0                       # 1bit 남은 경우 읽을 bit이 0이라 오류나네
+    else:
+        b = int(stream2[ii:ii+remain-1], base=2) << 1    # 마지막 1개는 0 채운다
+    c = ((a^b)<<(-remain)%8).to_bytes(remain_b, byteorder='big')
+    result += c
+    return bitstring.BitStream(result).bin if flag == 1 else result """
+
+def dxor_fast_bitstream(stream, none=0, flag=0):
+    if type(stream) is str: stream = bitstring.BitStream(bin=stream); flag=1      #상민 xor과의 호환성을위해
+    result = bytes()
+    part = len(stream)
+
+    """
+    before_1bit = 0
+    for ii in range(0, part-32, 32):            #   1 빗씩
+        tem_uint = []
+        for jj in range(31, -1, -1):
+            a = stream.read('uint:1')
+            b = before_1bit
+            before_1bit = (a^b)
+            tem_uint |= before_1bit << jj
+            ####tem_uint.append(before_1bit)
+        c = tem_uint.to_bytes(8, byteorder='big')
+        result += c
+    remain = part - stream.pos                  # 32미만으로 남았을때
+    remain_b = remain // 8                      #
+    remain_b += bool(remain % 8)                # 올림처리 위해
+
+    tem_uint = 0
+    for jj in range(remain-1, -1, -1):
+        a = stream.read('uint:1')
+        b = before_1bit
+        before_1bit = (a^b)
+        tem_uint |= before_1bit << jj
+    c = (tem_uint<<(-remain)%8).to_bytes(remain_b, byteorder='big')
+    result += c                                 # 처음 0bit을 안쓴채로 일단완성
+
+    sh1 = bitstring.BitStream(bin='0')
+    sh1.append(result)
+    result = sh1.peek(len(sh1)-1)
+    if before_1bit == 1:
+        result = (~result).tobytes()           # 마지막 1비트를 통해 뒤집을지말지 판단하고 마지막비트삭제해서 result로 담아
+    else:
+        result = (result).tobytes()
+    return bitstring.BitStream(result).bin if flag == 1 else result
+    """
+
+    result = []
+    result.append(0)
+    lastc = 0
+    a = stream.bin
+    for ii in range(len(stream)-1):
+        t = lastc ^ int(a[ii])
+        result.append(t)
+        lastc = t
+    t = lastc ^ int(a[-1])
+
+    result = bitstring.BitStream(result)
+    if t == 1:
+        result = ~result
+
+    return bitstring.BitStream(result).bin if flag == 1 else result.bytes
+
+
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
 def dec2bin(number, length):
     result = ''

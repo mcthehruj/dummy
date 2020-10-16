@@ -390,11 +390,13 @@ def scenario_act(event):                    ### 변조과정 ###      각 연구
         elif event.widget.current() == 1:                             ## 시나리오2 xor 변조
             print_dual(text_1_3, 'xor 변조 중입니다..')
             bitstream = bitstring.ConstBitStream(filename=seq1)
-            decstream = bitstream.read(bitstream.length).bin
-            count = factor(len(decstream))
-            decstream = xor_fast(decstream, count)
-            bitstream = bitstring.BitStream('0b' + decstream)
-            bitstream.tofile(open(src_plus_name + '_xor' + ext, 'wb'))  # 경로/seq.확장자 -> 경로/seq_xor.확장자
+            #decstream = bitstream.read(bitstream.length).bin
+            #count = factor(len(decstream))
+            #decstream = xor_fast(decstream, count)
+            bitstream = xor_fast_bitstream(bitstream)
+            #bitstream = bitstring.BitStream('0b' + decstream)
+            #bitstream.tofile(open(src_plus_name + '_xor' + ext, 'wb'))  # 경로/seq.확장자 -> 경로/seq_xor.확장자
+            (open(src_plus_name + '_xor' + ext, 'wb')).write(bitstream)  # 경로/seq.확장자 -> 경로/seq_xor.확장자
             vid2.changevideo(src_plus_name + '_xor' + ext)
             print_dual(text_1_3, '변조가 완료되었습니다.');
 
@@ -483,11 +485,13 @@ def scenario_inv_act():                       ### 복조과정   시나리오별
         elif 'xor' in catched_last1_line:                       #시나리오 2 xor 복조
             print_dual(text_2_3, 'xor 복조 중입니다..')
             bitstream = bitstring.ConstBitStream(filename=seq1)
-            decstream = bitstream.read(bitstream.length).bin
-            count = factor(len(decstream))
-            decstream = dxor_fast(decstream, count)
-            bitstream = bitstring.BitStream('0b' + decstream)
-            bitstream.tofile(open(src_plus_name + '_restored' + ext, 'wb'))
+            #decstream = bitstream.read(bitstream.length).bin
+            #count = factor(len(decstream))
+            #decstream = dxor_fast(decstream, count)
+            bitstream = dxor_fast_bitstream(bitstream)
+            #bitstream = bitstring.BitStream('0b' + decstream)
+            #bitstream.tofile(open(src_plus_name + '_restored' + ext, 'wb'))
+            (open(src_plus_name + '_restored' + ext, 'wb')).write(bitstream)
             vid4.changevideo(src_plus_name + '_restored' + ext)
             print_dual(text_2_3, '복조가 완료되었습니다.')
 
