@@ -209,10 +209,10 @@ def scenario_detect(frequency, video, count):           # 시나리오 디텍트
                 condition[h] = False
             # """
             if codec[frequency.index(max(frequency))] == 'H.263' and hh[h][1] >= 10:    # 헤더의 수가 너무 많으면 믿지 않는다
-                print('so many break', f' (inv{hh[0]} vs xor{hh[1]})')
+                print('so many break >= 10', f' (inv{hh[0]} vs xor{hh[1]})')
                 condition[h] = False
-            if codec[frequency.index(max(frequency))] == 'TIFF' and hh[h][0] != 1:      # 헤더의 수가 너무 많으면 믿지 않는다
-                print('TIFF !=1 break', f' (inv{hh[0]} vs xor{hh[1]})')
+            if codec[frequency.index(max(frequency))] == 'TIFF' and hh[h][0] >= 5:      # 헤더의 수가 너무 많으면 믿지 않는다
+                print('so many break >= 5', f' (inv{hh[0]} vs xor{hh[1]})')
                 condition[h] = False
             # """
 
@@ -448,6 +448,67 @@ def xor_fast(string, part=1):
 def dxor_fast(string, part=1):
     return decode_all(string, 'xor', part)
 
+
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+# 2메가 영상 xor 복조하는데 5분이 걸려서 비트스트림버전으로 변경
+
+def xor_fast_bitstream(stream):
+    result = bytes()
+    part = len(stream)
+    for ii in range(0, part-32, 32):            # 32배수로 돈다
+        a = stream.peek('uint:32')
+        stream.pos += 1
+        b = stream.peek('uint:32')
+        stream.pos += 31
+        c = (a^b).to_bytes(4, byteorder='big')
+        result += c
+    remain = part - stream.pos                  # 32미만으로 남았을때
+    remain_b = remain // 8                      #
+    remain_b += bool(remain % 8)                # 올림처리 위해
+    a = stream.peek(f'uint:{remain}')
+    stream.pos += 1
+    b = stream.peek(f'uint:{remain-1}') << 1    # 마지막 1개는 0 채운다
+    c = ((a^b)<<(-remain)%8).to_bytes(remain_b, byteorder='big')
+    result += c
+    return result                        ###### xorfast 마무리짓기 remain 잘 작동하는지확인
+
+def dxor_fast_bitstream(stream):
+    result = bytes()
+    part = len(stream)
+    before_1bit = 0
+    tem_uint = 0
+    for ii in range(0, part-32, 32):            #   1 빗씩
+        for jj in range(31, -1, -1):
+            a = stream.read('uint:1')
+            b = before_1bit
+            before_1bit = (a^b)
+            tem_uint |= before_1bit << jj
+        c = tem_uint.to_bytes(4, byteorder='big')
+        result += c
+    remain = part - stream.pos                  # 32미만으로 남았을때
+    remain_b = remain // 8                      #
+    remain_b += bool(remain % 8)                # 올림처리 위해
+
+    if part > 32:                               # 길이가 32 이하인경우 첫bit 무조건0으로 시작
+        for jj in range(remain-1, -1, -1):
+            a = stream.read('uint:1')
+            b = before_1bit
+            before_1bit = (a^b)
+            tem_uint |= before_1bit << jj
+        c = (tem_uint<<(-remain)%8).to_bytes(remain_b, byteorder='big')
+    else:
+        for jj in range(remain-1, -1, -1):
+            a = stream.read('uint:1')
+            b = before_1bit
+            before_1bit = (a^b)
+            tem_uint |= before_1bit << jj
+        c = (tem_uint<<(-remain)%8).to_bytes(remain_b, byteorder='big')
+    result += c
+
+    if before_1bit == 1:
+        result = (~bitstring.BitStream(result)).tobytes()
+    return result
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
 def dec2bin(number, length):
     result = ''
