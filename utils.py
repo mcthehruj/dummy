@@ -287,12 +287,12 @@ def xor_header(header_list, xor_flag=1):                                # 원래
             elif xor_flag == 1:
                 header_list_[i].append(xor_fast(header_list[i][j]))
                 # 스타트 코드 다음 한 비트가 0이냐 1이냐에 따라서 두 가지 결과가 나오기에 모두 저장
-                if header_list_[i][j][len(header_list_[i][j]) - 1] == '0':
-                    new = header_list_[i][j][:len(header_list_[i][j]) - 1]
+                if   header_list_[i][j*2][len(header_list_[i][j*2]) - 1] == '0':
+                    new = header_list_[i][j*2][:len(header_list_[i][j*2]) - 1]
                     new += '1'
                     header_list_[i].append(new)
-                elif header_list_[i][j][len(header_list_[i][j]) - 1] == '1':
-                    new = header_list_[i][j][:len(header_list_[i][j]) - 1]
+                elif header_list_[i][j*2][len(header_list_[i][j*2]) - 1] == '1':
+                    new = header_list_[i][j*2][:len(header_list_[i][j*2]) - 1]
                     new += '0'
                     header_list_[i].append(new)
     return header_list_
@@ -457,7 +457,7 @@ def dxor_fast(string, part=1):
 # 2메가 영상 xor 복조하는데 5분이 걸려서 비트스트림버전으로 변경
 
 def xor_fast_bitstream(stream, none=0, flag=0):
-    if type(stream) is str: stream = bitstring.BitStream(bin=stream); flag=1      #상민 xor과의 호환성을위해  bin스트링도 입력받고 binarystream도 가능
+    """if type(stream) is str: stream = bitstring.BitStream(bin=stream); flag=1      #상민 xor과의 호환성을위해  bin스트링도 입력받고 binarystream도 가능
     result = bytes()
     part = len(stream)
     for ii in range(0, part-32, 32):            # 32배수로 돈다
@@ -477,10 +477,10 @@ def xor_fast_bitstream(stream, none=0, flag=0):
         b = stream.peek(f'uint:{remain-1}') << 1    # 마지막 1개는 0 채운다
     c = ((a^b)<<(-remain)%8).to_bytes(remain_b, byteorder='big')
     result += c
-    return bitstring.BitStream(result).bin if flag == 1 else result
+    return bitstring.BitStream(result).bin if flag == 1 else result"""
 
-    """    if type(stream) is str: stream = bitstring.BitStream(bin=stream); flag=1      #상민 xor과의 호환성을위해  bin스트링도 입력받고 binarystream도 가능
-    result = bytes()
+    if type(stream) is str: stream = bitstring.BitStream(bin=stream); flag=1      #상민 xor과의 호환성을위해  bin스트링도 입력받고 binarystream도 가능
+    result = bytes() ; i = 0
     part = len(stream)
     stream1 = stream.bin
     stream2 = stream.bin[1:]
@@ -488,17 +488,17 @@ def xor_fast_bitstream(stream, none=0, flag=0):
         a = int(stream1[ii:ii+32], base=2)
         b = int(stream2[ii:ii+32], base=2)
         c = (a^b).to_bytes(4, byteorder='big')
-        result += c
-    remain = part - ii                          # 32미만으로 남았을때
+        result += c; i = ii+32
+    remain = part - i                          # 32미만으로 남았을때
     remain_b = remain // 8                      #
     remain_b += bool(remain % 8)                # 올림처리 위해
-    a = int(stream1[ii:ii+remain], base=2)
+    a = int(stream1[i:i+remain], base=2)
     if remain == 1: b = 0                       # 1bit 남은 경우 읽을 bit이 0이라 오류나네
     else:
-        b = int(stream2[ii:ii+remain-1], base=2) << 1    # 마지막 1개는 0 채운다
+        b = int(stream2[i:i+remain-1], base=2) << 1    # 마지막 1개는 0 채운다
     c = ((a^b)<<(-remain)%8).to_bytes(remain_b, byteorder='big')
     result += c
-    return bitstring.BitStream(result).bin if flag == 1 else result """
+    return bitstring.BitStream(result).bin if flag == 1 else result
 
 def dxor_fast_bitstream(stream, none=0, flag=0):
     if type(stream) is str: stream = bitstring.BitStream(bin=stream); flag=1      #상민 xor과의 호환성을위해
