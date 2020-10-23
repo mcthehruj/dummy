@@ -1,6 +1,9 @@
 import os, glob
 import winsound
 import threading
+# import tkiimport os, glob
+import winsound
+import threading
 import tkinter.messagebox
 from tkinter.filedialog import askopenfilename, askopenfilenames
 from tkinter import *
@@ -11,6 +14,7 @@ import PIL.Image
 import PIL.ImageTk
 import cv2
 from utils import *
+import tiff_scenario, png_scenario, bmp_scenario
 
 
 class VideoCaptureYUV:
@@ -184,8 +188,7 @@ class LoadDisplay(object):  # ui 영상창 클래스
                     "ldecod_ivc.exe %s 1t_youcandelete_%s" % (self.video_source, os.path.basename(self.video_source)),
                     stdout=subprocess.DEVNULL)  # 현재폴더에 재인코딩된 임시파일 생성
                 yuv_src = '1t_youcandelete_' + os.path.basename(self.video_source)
-                subprocess.run("ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i %s -c:v hevc -y %s.hevc" % (
-                yuv_src, os.path.splitext(yuv_src)[0]), stdout=subprocess.DEVNULL)
+                subprocess.run("ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i %s -c:v hevc -y %s.hevc" %(yuv_src, os.path.splitext(yuv_src)[0]), stdout=subprocess.DEVNULL)
                 # if os.path.isfile(os.path.splitext(yuv_src)[0] + '.hevc'): 파일이존재하지않을이유는없을걸
                 if os.path.getsize(os.path.splitext(yuv_src)[0] + '.hevc') > 1:
                     self.vid = cv2.VideoCapture(os.path.splitext(yuv_src)[0] + '.hevc')
@@ -346,8 +349,7 @@ def non_block_threding_popen(text, src, encoding='utf-8'):  ### 헉헉 겨우 �
             if tem == '': break
             if tem[0] != '[':
                 now = datetime.now()
-                text.insert('end-%dlines' % n, '[%d.%02d.%02d %d:%02d:%02d] ' % (
-                now.year, now.month, now.day, now.hour, now.minute, now.second))
+                text.insert('end-%dlines' % n, '[%d.%02d.%02d %d:%02d:%02d]' %(now.year, now.month, now.day, now.hour, now.minute, now.second))
 
     LoadDisplay.pausedisplay = 1
     canvas_loading.show()
@@ -437,7 +439,7 @@ def scenario_act(event):  ### 변조과정 ###      각 연구실 작성 요망
                                                                            '%s 존재하지 않음' % seq3)  # 더미-히든 실행 후 완료된 파일 vid2에 띄우기 ?.?.? 넣을까뺄까
             print_dual(text_1_3, '변조가 완료되었습니다.');
 
-        elif event.widget.current() == 3:  ## 시나리오4 장의선교수님연구실시나리오1
+        elif event.widget.current() == 3:  ## 시나리오4 header 변조
             print_dual(text_1_3, 'header 변조 중입니다..')
             if subprocess.call("start_code_encryptor.exe %s" % seq1) == 0:
                 vid2.changevideo(seq1 + '.st')
@@ -445,24 +447,61 @@ def scenario_act(event):  ### 변조과정 ###      각 연구실 작성 요망
             else:
                 print_dual(text_1_3, 'header 변조 불가한 비트스트림입니다.');
 
-        elif event.widget.current() == 4:  ## 시나리오5 장의선교수님연구실시나리오2
-            None  # 연구실별 변조 코드s here
+        elif event.widget.current() == 4:  ## 시나리오5 JPEG 양자화 테이블 변조
+            print_dual(text_1_3, 'JPEG 양자화 테이블 변조 중입니다.')
+            if ext in ['.jpg', '.j2k']:
+                try:
+                    non_block_threding_popen(text_1_3, "python.exe JPEG.py %s %d" % (seq1, 0))
+                    seq2 = src_plus_name + '_Distorted' + ext
+                    vid2.changevideo(seq2) if os.path.isfile(seq2) else print_dual(text_1_3, '%s 존재하지 않음' % seq2)
 
-        elif event.widget.current() == 5:  ## 시나리오6 장의선교수님연구실시나리오3
-            None  # 연구실별 변조 코드s here
+                except:
+                    print_dual(text_1_3, 'JPEG 양자화 테이블 변조가 불가합니다.')
 
-        elif event.widget.current() == 6:  ## 시나리오7 김창수교수님연구실시나리오1
-            None  # 연구실별 변조 코드s here
+            else:
+                print_dual(text_1_3, '입력 영상이 \'JPEG\' 영상이 아닙니다.')
 
-        elif event.widget.current() == 7:  ## 시나리오8 김창수교수님연구실시나리오2
-            None  # 연구실별 변조 코드s here
+        elif event.widget.current() == 5:  ## 시나리오6 BMP 변조
+            print_dual(text_1_3, 'BMP 변조 중입니다..')
+            if ext in ['.bmp']:
+                try:
+                    non_block_threding_popen(text_1_3, "python.exe bmp_scenario.py %s %d" % (seq1, 0))
+                    seq2 = src_plus_name + '_Distorted' + ext
+                    vid2.changevideo(seq2) if os.path.isfile(seq2) else print_dual(text_1_3, '%s 존재하지 않음' % seq2)
 
-        elif event.widget.current() == 8:  ## 시나리오9 김창수교수님연구실시나리오3
-            None  # 연구실별 변조 코드s here
+                except:
+                    print_dual(text_1_3, 'BMP 변조가 불가합니다.')
 
+            else:
+                print_dual(text_1_3, '입력 영상이 \'BMP\' 영상이 아닙니다.')
 
-        elif event.widget.current() == 9:  ## 시나리오10 예제   각 연구실에서 만든 win32 어플리케이션(혹은.py)을 불러옵니다.
-            non_block_threding_popen(text_1_3, ["ipconfig"], encoding='cp949')
+        elif event.widget.current() == 6:  ## 시나리오8 PNG 변조
+            print_dual(text_1_3, 'PNG 변조 중입니다..')
+            if ext in ['.png']:
+                try:
+                    non_block_threding_popen(text_1_3, "python.exe png_scenario.py %s %d" % (seq1, 0))
+                    seq2 = src_plus_name + '_Distorted' + ext
+                    vid2.changevideo(seq2) if os.path.isfile(seq2) else print_dual(text_1_3, '%s 존재하지 않음' % seq2)
+
+                except:
+                    print_dual(text_1_3, 'PNG 변조가 불가합니다.')
+
+            else:
+                print_dual(text_1_3, '입력 영상이 \'PNG\' 영상이 아닙니다.')
+
+        elif event.widget.current() == 7:  ## 시나리오9 TIFF 변조
+            print_dual(text_1_3, 'TIFF 변조 중입니다..')
+            if ext in ['.tiff']:
+                try:
+                    non_block_threding_popen(text_1_3, "python.exe tiff_scenario.py %s %d" % (seq1, 0))
+                    seq2 = src_plus_name + '_Distorted' + ext
+                    vid2.changevideo(seq2) if os.path.isfile(seq2) else print_dual(text_1_3, '%s 존재하지 않음' % seq2)
+
+                except:
+                    print_dual(text_1_3, 'TIFF 변조가 불가합니다.')
+
+            else:
+                print_dual(text_1_3, '입력 영상이 \'TIFF\' 영상이 아닙니다.')
 
         print_dual(text_1_3, "　")
         window.focus_force()
@@ -489,16 +528,45 @@ def scenario_inv_act():  ### 복조과정   시나리오별로 각 연구실에�
 
         # vid4.changevideo('close');
 
-        #######################################                                            # 1.  판단 과정
-        print_dual(text_2_3, '1. 시나리오 적용여부 판단 중입니다..')
-
         if subprocess.call("start_code_decryptor.exe %s" % seq1) == 0:
             print_dual(text_2_3, '2. 시나리오 복조를 시작합니다.')
             print_dual(text_2_3, 'header 복조 중입니다..')
             vid4.changevideo(seq1 + '.restored')
-            print_dual(text_2_3, '복조가 완료되었습니다.');
-            continue;
+            print_dual(text_2_3, '복조가 완료되었습니다.')
+            time.sleep(0.2)
+            continue
 
+        if subprocess.call(['python.exe', 'JPEG.py', seq1, '2']) == 0:  # 시나리오 7
+            print_dual(text_2_3, "JPEG 복조 중입니다..")
+            non_block_threding_popen(text_2_3, "python.exe JPEG.py %s %d" % (seq1, 1))
+            vid4.changevideo(seq1.replace('Distorted', 'Restored'))
+            print_dual(text_2_3, '복조가 완료되었습니다.')
+            continue
+
+        elif subprocess.call(['python.exe', 'bmp_scenario.py', seq1, '2']) == 0:  # 시나리오 8
+            print_dual(text_2_3, "BMP 복조 중입니다..")
+            non_block_threding_popen(text_2_3, "python.exe bmp_scenario.py %s %d" % (seq1, 1))
+            vid4.changevideo(seq1.replace('Distorted.bmp', 'Restored.bmp'))
+            print_dual(text_2_3, '복조가 완료되었습니다.')
+            continue
+
+        elif subprocess.call(['python.exe', 'png_scenario.py', seq1, '2']) == 0:  # 시나리오 9
+            print_dual(text_2_3, "PNG 복조 중입니다..")
+            non_block_threding_popen(text_2_3, "python.exe png_scenario.py %s %d" % (seq1, 1))
+            vid4.changevideo(seq1.replace('Distorted.png', 'Restored.png'))
+            print_dual(text_2_3, '복조가 완료되었습니다.')
+            continue
+
+        elif subprocess.call(['python.exe', 'tiff_scenario.py', seq1, '2']) == 0:  # 시나리오 10
+            print_dual(text_2_3, "TIFF 복조 중입니다..")
+            non_block_threding_popen(text_2_3, "python.exe tiff_scenario.py %s %d" % (seq1, 1))
+            vid4.changevideo(seq1.replace('Distorted.tiff', 'Restored.tiff'))
+            print_dual(text_2_3, '복조가 완료되었습니다.')
+            continue
+
+
+        #######################################                                            # 1.  판단 과정
+        print_dual(text_2_3, '1. 시나리오 적용여부 판단 중입니다..')
         non_block_threding_popen(text_2_3, "python.exe fakeke_enc_dec.py %s" % seq1)  # 1.1 더미-히든 판별모드 실행 (임시 하드코딩)
         if 'hidden' in text_2_3.get('end-2lines', END):
             None  # 더미-히든시나리오로 판단됐다면 상민딥 안돌리고 통과
@@ -510,6 +578,9 @@ def scenario_inv_act():  ### 복조과정   시나리오별로 각 연구실에�
 
         #######################################                                            # 2.  복조 과정
         print_dual(text_2_3, '2. 시나리오 복조를 시작합니다.')  # 각 연구실별 작성 요망
+
+
+
         if 'default' in catched_last1_line:  # 시나리오 적용 안된 경우
             print_dual(text_2_3, '변조된 내역이 없습니다.')
 
@@ -538,24 +609,6 @@ def scenario_inv_act():  ### 복조과정   시나리오별로 각 연구실에�
             non_block_threding_popen(text_2_3, "python.exe fakeke_enc_dec.py %s %s" % (seq1, '1'))  # 더미-히든 시나리오 복조모드 실행
             vid4.changevideo(src_plus_name + '_restored' + ext)  # 복조된 _restored 파일 디스플레이
             print_dual(text_2_3, "dummy-hidden restore complete")
-
-        elif '장의선교수님연구실시나리오1' in catched_last1_line:  # 시나리오 4
-            None  # 연구실별 복조 코드s here
-
-        elif '장의선교수님연구실시나리오2' in catched_last1_line:  # 시나리오 5
-            None  # 연구실별 복조 코드s here
-
-        elif '장의선교수님연구실시나리오3' in catched_last1_line:  # 시나리오 6
-            None  # 연구실별 복조 코드s here
-
-        elif '김창수교수님연구실시나리오1' in catched_last1_line:  # 시나리오 7
-            None  # 연구실별 복조 코드s here
-
-        elif '김창수교수님연구실시나리오2' in catched_last1_line:  # 시나리오 8
-            None  # 연구실별 복조 코드s here
-
-        elif '김창수교수님연구실시나리오3' in catched_last1_line:  # 시나리오 9
-            None  # 연구실별 복조 코드s here
 
         else:
             print_dual(text_2_3,
@@ -706,8 +759,9 @@ yscrollbar.config(command=text_2_3.yview)
 
 combo_1_2 = Combobox(frame1)
 combo_1_2['values'] = (
-    "Scenario-1 inverse", "Scenario-2 xor", "Scenario-3 더미-히든", "Scenario-4 header", "Scenario-5", "Scenario-6",
-    "Scenario-7", "Scenario-8", "Scenario-9", "Scenario-10 ipconfig예제")
+    "Scenario-1 inverse", "Scenario-2 xor", "Scenario-3 더미-히든", "Scenario-4 start code", "Scenario-5 jpg, j2k",
+    "Scenario-6 bmp",
+    "Scenario-7 png", "Scenario-8 tiff")
 combo_1_2.bind("<<ComboboxSelected>>", lambda event: canvas_loading.show() or scenario_act(
     event) or window.focus_force() or canvas_loading.forget())  # 함수 주소 전달인데 or이 먹히네...
 combo_1_2.current(0)  # set the selected item
