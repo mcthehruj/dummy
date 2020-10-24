@@ -187,54 +187,63 @@ def scenario_detect(frequency, video, count):           # 시나리오 디텍트
         gop = [hex2bin('49444154')]                                                         # idat
         psc = []                                                                            # None
     elif frequency.index(max(frequency)) == 10:                                             # TIFF
-        ssc = [hex2bin('4949'), hex2bin('4d4d')]                                            # hd1
-        sec = [hex2bin('002a'), hex2bin('2a00')]                                            # hd2
+        ssc = [hex2bin('4949002a'), hex2bin('49492a00'), hex2bin('4d4d002a'), hex2bin('4d4d2a00')]  # hd1
+        sec = []                                                                            # None
         gop = []                                                                            # None
         psc = []                                                                            # None
     all = list2int(ssc) + list2int(sec) + list2int(gop) + list2int(psc)
     hr = scenario_search(video, xor_header([ssc, sec, gop, psc], xor_flag=0))
     hx = scenario_search(video, xor_header([ssc, sec, gop, psc], xor_flag=1))
-    # 더미 헤더를 한번 세줘야돼요
     video.pos = 0
     video = video.read(video.length).bin
     hh = [hr, hx]                                                               # 더미 헤더 카운트 추가
     condition = [True, True]                                                    # 더미 헤더 카운트 추가
 
+    for h in range(len(hh)):                   # h =[hr, hx]
+        if sum(hh[h]) == 0 or hh[h][0] == 0:                                 # 모두 0 이어야 제외하도록 바꿔봄
+            condition[h] = False
 
+        if codec[frequency.index(max(frequency))] == 'BITMAP':
+            if hh[h][0] != 1:       # 헤더의 수가 너무 많으면 믿지 않는다
+                print('too many header > 1', f'(inv{hh[0]} vs xor{hh[1]})')
+                condition[h] = False
 
-    for h in range(len(hh)):
-        for l in range(all):
-            #if hh[h][l] == 0:                                  # 등록된 ssc sec gop psc 중 0검출이 하나라도 있으면 해당 코덱을 제외해야하는가?
-            if sum(hh[h]) == 0:                                 # 모두 0 이어야 제외하도록 바꿔봄
+        if codec[frequency.index(max(frequency))] == 'H.263':
+            if hh[h][1] >= 10:      # 헤더의 수가 너무 많으면 믿지 않는다
+                print('so many break >= 10', f'(inv{hh[0]} vs xor{hh[1]})')
                 condition[h] = False
-            # """
-            if codec[frequency.index(max(frequency))] == 'H.263' and hh[h][1] >= 10:    # 헤더의 수가 너무 많으면 믿지 않는다
-                print('so many break >= 10', f' (inv{hh[0]} vs xor{hh[1]})')
-                condition[h] = False
-            if codec[frequency.index(max(frequency))] == 'TIFF' and hh[h][0] >= 5:      # 헤더의 수가 너무 많으면 믿지 않는다
-                print('so many break >= 5', f' (inv{hh[0]} vs xor{hh[1]})')
-                condition[h] = False
-            # """
 
-    if sum(condition)==2:                           # 1차로 대충 걸른 후에도 둘다 참이라면 대소비교를 하자
+        if codec[frequency.index(max(frequency))] == 'TIFF' or codec[frequency.index(max(frequency))] == 'JPEG':        #'JPEG2000', 'PNG', 'TIFF'
+            if h == 0:
+                if hh[h][0] != 1:       # 헤더의 수가 너무 많으면 믿지 않는다
+                    print('too many header > 1', f'(inv{hh[0]} vs xor{hh[1]})')
+                    condition[h] = False
+            else:
+                if hh[h][0] > 2:        # 헤더의 수가 너무 많으면 믿지 않는다
+                    print('too many header > 1', f'(inv{hh[0]} vs xor{hh[1]})')
+                    condition[h] = False
+
+    if sum(condition) == 2:          # 1차로 대충 걸른 후에도 둘다 참이라면 대소비교를 하자
         if hr < hx:
             condition[0] = False
         else:
             condition[1] = False
 
-    if sum(condition)==1:                           # 하나 남는다면 확정처리
-        if condition[0]==1: detected_scenario = 1
-        if condition[1]==1: detected_scenario = 2
-        #print('# of %s headers ->' % scenario_list[detected_scenario], hh[h])
+    if sum(condition) == 1:                           # 하나 남는다면 확정처리
+        if condition[0] == 1:
+            detected_scenario = 1
+        if condition[1] == 1:
+            detected_scenario = 2
+        # print('# of %s headers ->' % scenario_list[detected_scenario], hh[h])
         print(scenario_list[detected_scenario], f'found (inv{hh[0]} vs xor{hh[1]})' )
         if detected_scenario == 1:
-            None#video = encode(video, 'inv')
+            None        # video = encode(video, 'inv')
         elif detected_scenario == 2:
-            None#video = dxor_fast(video, count)             # ui에서 복호화 하자
+            None        # video = dxor_fast(video, count)             # ui에서 복호화 하자
         return detected_scenario, video
 
     # 둘 다 탈락한 경우 렛미트라이로
-    print('Unknown scenario or codec mismatched!' , f' (inv{hh[0]} vs xor{hh[1]})' )
+    print('Unknown scenario or codec mismatched!', f'(inv{hh[0]} vs xor{hh[1]})' )
     print('Let me try the second best prediction!')
     frequency[frequency.index(max(frequency))] -= 100
     if max(frequency) < -99:
