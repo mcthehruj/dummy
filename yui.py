@@ -14,6 +14,11 @@ from utils import *
 import tiff_scenario, png_scenario, bmp_scenario
 
 
+def isHangul(text):
+    encText = text
+    hanCount = len(re.findall(u'[\u3130-\u318F\uAC00-\uD7A3]+', encText))
+    return hanCount > 0
+
 class VideoCaptureYUV:
     def __init__(self, filename, size):
         self.height, self.width = size
@@ -138,6 +143,7 @@ class LoadDisplay(object):  # ui 영상창 클래스
         if not self.vid.isOpened():  # 열리지 않았다면
             if os.path.isfile(self.video_source):  ## 영상 존재   png,  YUV 케이스?
                 print('(debug) imread로 시도')
+                if isHangul(self.video_source): print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "(debug) cv2.imread png: 경로에 한글 주소가 포함되어 있어 디코딩 불가"); return
                 self.frame = cv2.imread(self.video_source)
                 if self.frame is not None:  # imread로 열기 성공
                     b, g, r = cv2.split(self.frame)
@@ -303,12 +309,13 @@ def set_slider(slidername, *args):
 
 
 def print_dual(text, aa):
-    now = datetime.now()
-    print('[%d.%02d.%02d %d:%02d:%02d]' % (now.year, now.month, now.day, now.hour, now.minute, now.second), end='')
-    text.insert(END, '[%d.%02d.%02d %d:%02d:%02d]' % (now.year, now.month, now.day, now.hour, now.minute, now.second))
-    print(aa)
     if aa == '': return;
-    if type(aa) == str: text.insert(END, aa + '\n')
+    now = datetime.now(); strt = '[%d.%02d.%02d %d:%02d:%02d] ' % (now.year, now.month, now.day, now.hour, now.minute, now.second)
+    print(strt, end='')
+    text.insert(END, strt)
+    print(aa)
+    if type(aa) == str:
+        text.insert(END, aa + '\n')
     if type(aa) == list:
         print_dual_nocl(text, '   frequency is [')
         for a in aa:
@@ -339,7 +346,7 @@ def non_block_threding_popen(text, src, encoding='utf-8'):  # stdout를 read로 
             return  # print("탈출");
 
     def time_write():
-        for n in range(2, 20):
+        for n in range(2, 8):
             tem = text.get('end-%dlines' % n, 'end-%dlines' % (n - 1))
             if tem == '': break
             if tem[0] != '[':
@@ -356,7 +363,7 @@ def non_block_threding_popen(text, src, encoding='utf-8'):  # stdout를 read로 
 
     while p.poll() is None:  # read line without blocking
         try:
-            line = q.get(timeout=.03)  # or q.get(timeout=.1)
+            line = q.get(timeout=.08)  # or q.get(timeout=.1)
         except:
             time_write()
             text.see(END)
@@ -365,7 +372,7 @@ def non_block_threding_popen(text, src, encoding='utf-8'):  # stdout를 read로 
             text.insert(END, line)
             continue
     time.sleep(0.01)
-    p.stdout.close()  # 개거지같은 파이썬
+    p.stdout.close()  # 파이썬..
     time_write()
     text.see(END)
     canvas_loading.forget()
@@ -402,15 +409,15 @@ def scenario_act(event):  ### 변조과정 ###                  # 이 함수는 
             c_i = ["Scenario-1 inverse" , "Scenario-2 xor", ' ', ' ', ' ', ' ', ' ', ' ']
             for s in srcs:
                 ext = os.path.splitext(s)[1]
-                if '.jpg'  in ext or '.j2k' in ext: c_i[4] = "Scenario-5 jpg, j2k"
-                if '.bmp'  in ext: c_i[5] = "Scenario-6 bmp"
-                if '.png'  in ext: c_i[6] = "Scenario-7 png"
-                if '.tiff' in ext: c_i[7] = "Scenario-8 tiff"
-                if '.m2v'  in ext: c_i[2] = "Scenario-3 더미-히든"; c_i[3] = "Scenario-4 start code";
-                if '.263'  in ext: c_i[2] = "Scenario-3 더미-히든"
-                if '.264'  in ext: c_i[2] = "Scenario-3 더미-히든"; c_i[3] = "Scenario-4 start code";
-                if '.hevc' in ext: c_i[2] = "Scenario-3 더미-히든"; c_i[3] = "Scenario-4 start code";
-                if '.bit'  in ext: c_i[2] = "Scenario-3 더미-히든"; c_i[3] = "Scenario-4 start code";
+                if ext in ['.jpg','.j2k']: c_i[4] = "Scenario-5 jpg, j2k"
+                if ext in '.bmp' : c_i[5] = "Scenario-6 bmp"
+                if ext in '.png' : c_i[6] = "Scenario-7 png"
+                if ext in '.tiff': c_i[7] = "Scenario-8 tiff"
+                if ext in '.m2v' : c_i[2] = "Scenario-3 더미-히든"; c_i[3] = "Scenario-4 start code";
+                if '263' in ext  : c_i[2] = "Scenario-3 더미-히든"
+                if '264' in ext  : c_i[2] = "Scenario-3 더미-히든"; c_i[3] = "Scenario-4 start code";
+                if ext in '.hevc': c_i[2] = "Scenario-3 더미-히든"; c_i[3] = "Scenario-4 start code";
+                if ext in '.bit' : c_i[2] = "Scenario-3 더미-히든"; c_i[3] = "Scenario-4 start code";
             while ' '  in c_i: c_i.remove(' ')           # 빈 리스트 제거
             frame1.children['!combobox']['values'] = c_i
             print_dual(text_1_3, f' {len(srcs)}개의 입력 영상을 선택하였습니다.  ')
@@ -539,6 +546,14 @@ def scenario_inv_act():  ### 복조과정   시나리오별로 각 연구실에�
         print_dual(text_2_3, f'({iii + 1}/{len(srcs)}) {name}{ext}')
         vid3.changevideo(seq1)  # 입력영상 띄우기
 
+        print('(d) 더미히든여부확인');  non_block_threding_popen(text_2_3, "python.exe fakeke_enc_dec.py %s" % seq1)  # 1.1 더미-히든 판별모드 실행 (임시 하드코딩)
+        if 'hidden' in text_2_3.get('end-2lines', END):  # 시나리오 3     # 더미-히든 복조
+            print_dual(text_2_3, "dummy-hidden restore start")
+            non_block_threding_popen(text_2_3, "python.exe fakeke_enc_dec.py %s %s" % (seq1, '1'))  # 더미-히든 시나리오 복조모드 실행
+            vid4.changevideo(src_plus_name + '_restored' + ext)  # 복조된 _restored 파일 디스플레이
+            print_dual(text_2_3, "dummy-hidden restore complete") ; continue
+
+
         if subprocess.call("start_code_decryptor.exe %s" % seq1) == 0: ## 시나리오4 header 변조 check
             print_dual(text_2_3, '2. 시나리오 복조를 시작합니다.')
             print_dual(text_2_3, 'header 복조 중입니다..')
@@ -575,10 +590,9 @@ def scenario_inv_act():  ### 복조과정   시나리오별로 각 연구실에�
             print_dual(text_2_3, '복조가 완료되었습니다.')
             continue
 
+
         print_dual(text_2_3, '범용적 변형 시나리오 적용여부 판단 중입니다..')                               ## 시나리오1-3 변조 check
-        non_block_threding_popen(text_2_3, "python.exe fakeke_enc_dec.py %s" % seq1)                # 1.1 더미-히든 판별모드 실행 (임시 하드코딩)
-        if 'hidden' in text_2_3.get('end-2lines', END): None                                        # 더미-히든시나리오로 판단됐다면 codec_prediction.py 안돌리고 통과
-        else: non_block_threding_popen(text_2_3, "python.exe codec_prediction.py %s" % seq1)        # 1.2 더미-히든 아닐경우 codec_prediction.py 돌림
+        non_block_threding_popen(text_2_3, "python.exe codec_prediction.py %s" % seq1)        # 1.2 더미-히든 아닐경우 codec_prediction.py 돌림
 
 
         # MPEG2 H.263 H.264 H.265 IVC VP8 JPEG JPEG2000 BMP PNG TIFF 코덱과
@@ -604,12 +618,6 @@ def scenario_inv_act():  ### 복조과정   시나리오별로 각 연구실에�
             (open(src_plus_name + '_restored' + ext, 'wb')).write(bitstream)
             vid4.changevideo(src_plus_name + '_restored' + ext)
             print_dual(text_2_3, '복조가 완료되었습니다.')
-
-        elif 'dummy-hidden.' in catched_last1_line:  # 시나리오 3     # 더미-히든 복조
-            print_dual(text_2_3, "dummy-hidden restore start")
-            non_block_threding_popen(text_2_3, "python.exe fakeke_enc_dec.py %s %s" % (seq1, '1'))  # 더미-히든 시나리오 복조모드 실행
-            vid4.changevideo(src_plus_name + '_restored' + ext)  # 복조된 _restored 파일 디스플레이
-            print_dual(text_2_3, "dummy-hidden restore complete")
 
         else:
             print_dual(text_2_3, '%s <- 이 마지막 메세지를 인식하지 못했기에 복조 시나리오로 넘어가지 못했습니다. 혹은 복조 프로세스가 오류종료 하였음' % catched_last1_line[:-2])

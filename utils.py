@@ -10,6 +10,8 @@ from torch.autograd import Variable
 import matplotlib.pyplot as plt
 import math
 from datetime import datetime
+import timeit
+import time
 
 
 def list2int(list):
@@ -130,6 +132,8 @@ def scenario_detect(frequency, video, count):           # 시나리오 디텍트
         sec = [hex2bin('000001b5')]
         gop = [hex2bin('000001b8')]
         psc = [hex2bin('00000100')]
+        start = False
+
     elif frequency.index(max(frequency)) == 1:                                              # H.263
         ssc = [hex2bin('000080'), hex2bin('000081'), hex2bin('000082'), hex2bin('000083')]  # psc
         # sec = [hex2bin('0000fc'), hex2bin('0000fd'), hex2bin('0000fe'), hex2bin('0000ff')]# eos
@@ -146,54 +150,75 @@ def scenario_detect(frequency, video, count):           # 시나리오 디텍트
         # """
         gop = []
         psc = []
+        start = True
+
     elif frequency.index(max(frequency)) == 2:                                              # H.264
         ssc = [hex2bin('0000000167')]                                                       # sps
         sec = [hex2bin('0000000168')]                                                       # pps
         gop = [hex2bin('0000000165'), hex2bin('0000010605')]                                # idr
         psc = [hex2bin('0000000141')]                                                       # nidr
+        start = False
+
     elif frequency.index(max(frequency)) == 3:                                              # H.265
-        ssc = [hex2bin('000001')]                                                           # sps
+        ssc = [hex2bin('00000001')]                                                           # sps
         sec = [hex2bin('000003')]                                                           # pps
         gop = []                                                                            # idr
         psc = []                                                                            # nidr
+        start = False
+
     elif frequency.index(max(frequency)) == 4:                                              # IVC
         ssc = [hex2bin('000001b0')]                                                         # vsc
         sec = [hex2bin('00000100')]                                                         # vec
         gop = [hex2bin('000001b2')]                                                         # usc
         psc = [hex2bin('000001b3')]                                                         # udc
+        start = True
+
     elif frequency.index(max(frequency)) == 5:                                              # VP8
         ssc = [hex2bin('1a45dfa3010000000000001f')]                                         # sc
         sec = [hex2bin('7765626d')]                                                         # webm
         gop = [hex2bin('1549a96601')]                                                       # ed1
         psc = [hex2bin('00000000000032')]                                                   # ed2
+        start = True
+
     elif frequency.index(max(frequency)) == 6:                                              # JPEG
         ssc = [hex2bin('ffd8')]                                                             # sc
         sec = [hex2bin('ffc0'), hex2bin('ffc2')]                                            # sof
         gop = []                                                                            # None
         psc = []                                                                            # None
+        start = True
+
     elif frequency.index(max(frequency)) == 7:                                              # JPEG2000
         ssc = [hex2bin('ff4f')]                                                             # sc
         sec = [hex2bin('ff90')]                                                             # sot
         gop = [hex2bin('ff93')]                                                             # sod
         psc = []                                                                            # siz
+        start = True
+
     elif frequency.index(max(frequency)) == 8:                                              # BMP
         ssc = [hex2bin('424d')]                                                             # hd1
         sec = [hex2bin('28000000'), hex2bin('0c000000'), hex2bin('40000000'), hex2bin('6c000000'), hex2bin('7c000000')]
         gop = []                                                                            # V3
         psc = []                                                                            # None
+        start = True
+
     elif frequency.index(max(frequency)) == 9:                                              # PNG
         ssc = [hex2bin('89504e47')]                                                         # hd1
         sec = [hex2bin('49484452')]                                                         # ihdr
         gop = [hex2bin('49444154')]                                                         # idat
         psc = []                                                                            # None
+        start = True
+
     elif frequency.index(max(frequency)) == 10:                                             # TIFF
-        ssc = [hex2bin('4949002a'), hex2bin('49492a00'), hex2bin('4d4d002a'), hex2bin('4d4d2a00')]  # hd1
-        sec = []                                                                            # None
+        ssc = [hex2bin('4949'), hex2bin('4d4d')]                                            # hd1
+        sec = [hex2bin('002a'), hex2bin('2a00')]                                            # hd2
         gop = []                                                                            # None
         psc = []                                                                            # None
+        start = True
+
     all = list2int(ssc) + list2int(sec) + list2int(gop) + list2int(psc)
-    hr = scenario_search(video, xor_header([ssc, sec, gop, psc], xor_flag=0))
-    hx = scenario_search(video, xor_header([ssc, sec, gop, psc], xor_flag=1))
+    hr = scenario_search(video, xor_header([ssc, sec, gop, psc], xor_flag=0), start=start)
+    hx = scenario_search(video, xor_header([ssc, sec, gop, psc], xor_flag=1), start=start)
+
     video.pos = 0
     video = video.read(video.length).bin
     hh = [hr, hx]                                                               # 더미 헤더 카운트 추가
@@ -320,7 +345,29 @@ def scenario_search(video, header_list):
                 frequency_header[k] += 1
     return frequency_header
 """
-def scenario_search(video, header_list):
+# def scenario_search(video, header_list):
+#     frequency_header = [0] * len(header_list)
+#     time_scale = 30  # 1일때 모든 비트스트림을 다 본다. 시간이 너무 길게 걸리므로 이 값을 늘리면서 실험하는 것을 추천.
+#
+#     video = video.bin       # binstring read로 읽어오게되면 bit 개수만큼 파일리드를 그제서야 돌려서 엄청오래걸리는듯,, bin str으로 처리하는게 빠름
+#
+#     limit = len(video) // time_scale
+#     if limit < 5000:   limit = 5000           # 하한
+#     if limit > 60000: limit = 60000           # 상한   120000 정도가 적당한거 같은데 느리니까 60000
+#     bin_header_list = header_list
+#     #for aa in header_list:                                                      # nalu에 여러개를 등록한 경우 ssc sec ...4개(aa)를 돌며 ..
+#     #    bin_header_list.append( [bitstring.BitStream(bin=bb) for bb in aa] )    # bb개
+#
+#     for ii in range(0, limit, 8):
+#         #video.pos = ii                                              # 비트위치 ii
+#         for k in range(len(bin_header_list)):                       # 헤더리스트 4개에 대한 포문
+#             if bin_header_list[k] == []: continue
+#             for kk in range(len(bin_header_list[k])):               # nalu 쌍들 여러개에 대한 포문
+#                 if video[ii:ii+len(bin_header_list[k][kk])] == bin_header_list[k][kk]: frequency_header[k] += 1
+#                 #if video[ii:].startswith(bin_header_list[k][kk]): frequency_header[k] += 1                                  # startswith 왜이렇게 느린가... 100배 차이남
+#     return frequency_header
+
+def scenario_search(video, header_list,start=False):
     frequency_header = [0] * len(header_list)
     time_scale = 30  # 1일때 모든 비트스트림을 다 본다. 시간이 너무 길게 걸리므로 이 값을 늘리면서 실험하는 것을 추천.
 
@@ -330,16 +377,27 @@ def scenario_search(video, header_list):
     if limit < 5000:   limit = 5000           # 하한
     if limit > 60000: limit = 60000           # 상한   120000 정도가 적당한거 같은데 느리니까 60000
     bin_header_list = header_list
-    #for aa in header_list:                                                      # nalu에 여러개를 등록한 경우 ssc sec ...4개(aa)를 돌며 ..
-    #    bin_header_list.append( [bitstring.BitStream(bin=bb) for bb in aa] )    # bb개
 
-    for ii in range(0, limit, 8):
-        #video.pos = ii                                              # 비트위치 ii
-        for k in range(len(bin_header_list)):                       # 헤더리스트 4개에 대한 포문
-            if bin_header_list[k] == []: continue
-            for kk in range(len(bin_header_list[k])):               # nalu 쌍들 여러개에 대한 포문
-                if video[ii:ii+len(bin_header_list[k][kk])] == bin_header_list[k][kk]: frequency_header[k] += 1
-                #if video[ii:].startswith(bin_header_list[k][kk]): frequency_header[k] += 1                                  # startswith 왜이렇게 느린가... 100배 차이남
+    if start == True:
+        for kk in range(len(bin_header_list[0])):
+            if video[0:len(header_list[0][0])] == header_list[0][kk]:
+                frequency_header[0] += 1
+        for ii in range(0, limit, 8):                #video.pos = ii                                              # 비트위치 ii
+            for k in range(len(bin_header_list)):                       # 헤더리스트 4개에 대한 포문
+                if k == 0:
+                    continue
+                if bin_header_list[k] == []: continue
+                for kk in range(len(bin_header_list[k])):               # nalu 쌍들 여러개에 대한 포문
+                    if video[ii:ii+len(bin_header_list[k][kk])] == bin_header_list[k][kk]: frequency_header[k] += 1
+                        # if video[ii:].startswith(bin_header_list[k][kk]): frequency_header[k] += 1                                  # startswith 왜이렇게 느린가... 100배 차이남
+    else:
+        for ii in range(0, limit, 8):
+                #video.pos = ii                                              # 비트위치 ii
+            for k in range(len(bin_header_list)):                       # 헤더리스트 4개에 대한 포문
+                if bin_header_list[k] == []: continue
+                for kk in range(len(bin_header_list[k])):               # nalu 쌍들 여러개에 대한 포문
+                    if video[ii:ii+len(bin_header_list[k][kk])] == bin_header_list[k][kk]: frequency_header[k] += 1
+                        # if video[ii:].startswith(bin_header_list[k][kk]): frequency_header[k] += 1                                  # startswith 왜이렇게 느린가... 100배 차이남
     return frequency_header
 
 
@@ -489,7 +547,7 @@ def xor_fast_bitstream(stream, none=0, flag=0):
     return bitstring.BitStream(result).bin if flag == 1 else result"""
 
     if type(stream) is str: stream = bitstring.BitStream(bin=stream); flag=1      #상민 xor과의 호환성을위해  bin스트링도 입력받고 binarystream도 가능
-    result = bytes() ; i = 0
+    result = bytearray() ; i = 0
     part = len(stream)
     stream1 = stream.bin
     stream2 = stream.bin[1:]
@@ -510,14 +568,15 @@ def xor_fast_bitstream(stream, none=0, flag=0):
     return bitstring.BitStream(result).bin if flag == 1 else result
 
 def dxor_fast_bitstream(stream, none=0, flag=0):
-    if type(stream) is str: stream = bitstring.BitStream(bin=stream); flag=1      #상민 xor과의 호환성을위해
-    result = bytes()
+
+    #if type(stream) is str: stream = bitstring.BitStream(bin=stream); flag=1      #상민 xor과의 호환성을위해
+    """stream = stream.bin
+    result = bytearray()
     part = len(stream)
 
-    """
     before_1bit = 0
     for ii in range(0, part-32, 32):            #   1 빗씩
-        tem_uint = []
+        tem_uint = 0
         for jj in range(31, -1, -1):
             a = stream.read('uint:1')
             b = before_1bit
@@ -529,7 +588,6 @@ def dxor_fast_bitstream(stream, none=0, flag=0):
     remain = part - stream.pos                  # 32미만으로 남았을때
     remain_b = remain // 8                      #
     remain_b += bool(remain % 8)                # 올림처리 위해
-
     tem_uint = 0
     for jj in range(remain-1, -1, -1):
         a = stream.read('uint:1')
@@ -538,7 +596,6 @@ def dxor_fast_bitstream(stream, none=0, flag=0):
         tem_uint |= before_1bit << jj
     c = (tem_uint<<(-remain)%8).to_bytes(remain_b, byteorder='big')
     result += c                                 # 처음 0bit을 안쓴채로 일단완성
-
     sh1 = bitstring.BitStream(bin='0')
     sh1.append(result)
     result = sh1.peek(len(sh1)-1)
@@ -547,8 +604,8 @@ def dxor_fast_bitstream(stream, none=0, flag=0):
     else:
         result = (result).tobytes()
     return bitstring.BitStream(result).bin if flag == 1 else result
-    """
 
+    """
     result = []
     result.append(0)
     lastc = 0
@@ -560,8 +617,7 @@ def dxor_fast_bitstream(stream, none=0, flag=0):
     t = lastc ^ int(a[-1])
 
     result = bitstring.BitStream(result)
-    if t == 1:
-        result = ~result
+    if t == 1: result = ~result
 
     return bitstring.BitStream(result).bin if flag == 1 else result.bytes
 
