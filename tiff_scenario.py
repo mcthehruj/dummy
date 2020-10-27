@@ -56,7 +56,7 @@ def Restoration(fn):
     for i in range(1, 5):
         try:
             if ext == '.tiff':
-                img = cv2.imread('tmp/Candidates_%d.tiff' % (i))
+                img = cv2.imread('tmp/Candidates_%d.tiff' % (i), 0)
             if img is None:
                 score_list.append(99999)
             else:

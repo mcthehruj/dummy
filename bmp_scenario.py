@@ -22,6 +22,7 @@ def Distortion(filename):
     biHeight_int = int.from_bytes(biHeight, 'little')
 
     candidates = [200, 300, 400, 500]
+
     candidate_res = candidates[random.randint(0, 3)]
     modified_biWidth = int(biWidth_int + candidate_res).to_bytes(2, byteorder='little')
     modified_biHeight = int(biHeight_int + candidate_res).to_bytes(2, byteorder='little')
@@ -35,6 +36,7 @@ def Distortion(filename):
 
 def Candidate_BMP(Bin_BMP):
     candidates = [200, 300, 400, 500]
+
     BMP_header_chunk_length = 14
 
     biWidth = Bin_BMP[BMP_header_chunk_length + 4:BMP_header_chunk_length + 8]
@@ -70,13 +72,15 @@ def Restoration(fn):
     score_list = []
 
     for i in range(1, 5):
-        try:
-            if ext == '.bmp':
-                img = cv2.imread('tmp/Candidates_%d.bmp' % (i))
-            score_list.append(brisque.get_score(img))
-        except:
+        if ext == '.bmp':
+            img = cv2.imread('tmp/Candidates_%d.bmp' % (i), 0)
+        if img is None:
             score_list.append(99999)
+        else:
+            img = cv2.equalizeHist(img)
+            score_list.append(np.nan_to_num(brisque.get_score(img)))
 
+    # print(score_list)
     restore_idx = np.argmin(score_list)
 
     shutil.copy('tmp/Candidates_%d%s' % (restore_idx+1, ext), fn.replace('_Distorted', '_Restored'))

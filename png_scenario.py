@@ -63,6 +63,8 @@ def Distortion(filename, new_stream=b'\x9d\xe5', new_stream_2nd=b'\x8c\xd4'):
 
 def Restoration(filename):
     brisque = BRISQUE()
+    ext = os.path.splitext(filename)[1]
+
     case_list = [
         [0, 0],
         [0, 1],
@@ -144,15 +146,13 @@ def Restoration(filename):
     score_list = []
 
     for i in range(1, 5):
-        try:
-            if ext == '.png':
-                img = cv2.imread('tmp/Candidates_{}.png'.format(i), 0)  # read as gray scale
-            if img is None:
-                score_list.append(99999)
-            else:
-                score_list.append(np.nan_to_num(brisque.get_score(img)))
-        except:
+        if ext == '.png':
+            img = cv2.imread('tmp/Candidates_{}.png'.format(i), 0)  # read as gray scale
+        if img is None:
             score_list.append(99999)
+        else:
+            img = cv2.equalizeHist(img)
+            score_list.append(np.nan_to_num(brisque.get_score(img)))
 
     score_threshold = 0
     for i in score_list:
