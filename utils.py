@@ -826,22 +826,22 @@ if __name__ == "__main__":  # def sangmin_deep_predict(mode, src):
 
             if codec[frequency.index(max(frequency))] == 'BITMAP':
                 if hh[h][0] != 1:       # 헤더의 수가 너무 많으면 믿지 않는다
-                    print('too many header > 1', f'(inv{hh[0]} vs xor{hh[1]})')
+                    print('too many header > 1', f'(inv{hh[0]} vs x_or{hh[1]})')
                     condition[h] = False
 
             if codec[frequency.index(max(frequency))] == 'H.263':
                 if hh[h][1] >= 10:      # 헤더의 수가 너무 많으면 믿지 않는다
-                    print('so many break >= 10', f'(inv{hh[0]} vs xor{hh[1]})')
+                    print('so many break >= 10', f'(inv{hh[0]} vs x_or{hh[1]})')
                     condition[h] = False
 
-            if codec[frequency.index(max(frequency))] == 'TIFF' or codec[frequency.index(max(frequency))] == 'JPEG':        #'JPEG2000', 'PNG', 'TIFF'
+            if codec[frequency.index(max(frequency))] == 'TIFF' or codec[frequency.index(max(frequency))] == 'JPEG' or codec[frequency.index(max(frequency))] == 'PNG':        #'JPEG2000', 'PNG', 'TIFF'
                 if h == 0:
                     if hh[h][0] != 1:       # 헤더의 수가 너무 많으면 믿지 않는다
-                        print('too many header > 1', f'(inv{hh[0]} vs xor{hh[1]})')
+                        print('too many header > 1', f'(inv{hh[0]} vs x_or{hh[1]})')
                         condition[h] = False
                 else:
                     if hh[h][0] > 2:        # 헤더의 수가 너무 많으면 믿지 않는다
-                        print('too many header > 1', f'(inv{hh[0]} vs xor{hh[1]})')
+                        print('too many header > 1', f'(inv{hh[0]} vs x_or{hh[1]})')
                         condition[h] = False
 
         if sum(condition) == 2:          # 1차로 대충 걸른 후에도 둘다 참이라면 대소비교를 하자
@@ -856,7 +856,7 @@ if __name__ == "__main__":  # def sangmin_deep_predict(mode, src):
             if condition[1] == 1:
                 detected_scenario = 2 # xor
             # print('# of %s headers ->' % scenario_list[detected_scenario], hh[h])
-            print(scenario_list[detected_scenario], f'found (inv{hh[0]} vs xor{hh[1]})' )
+            print(scenario_list[detected_scenario], f'found (inv{hh[0]} vs x_or{hh[1]})' )
             if detected_scenario == 1:
                 None        # video = encode(video, 'inv')
             elif detected_scenario == 2:
@@ -865,7 +865,7 @@ if __name__ == "__main__":  # def sangmin_deep_predict(mode, src):
             sys.exit(detected_scenario)
 
         # # 둘 다 탈락한 경우 렛미트라이로
-        # print('Unknown scenario or codec mismatched!', f'(inv{hh[0]} vs xor{hh[1]})' )
+        # print('Unknown scenario or codec mismatched!', f'(inv{hh[0]} vs x_or{hh[1]})' )
         # print('Let me try the second best prediction!')
         # frequency[frequency.index(max(frequency))] -= 100
         # if max(frequency) < -99:

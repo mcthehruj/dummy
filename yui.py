@@ -577,14 +577,16 @@ def scenario_inv_act():  ### 복조과정   시나리오별로 각 연구실에�
 
 
         catched_last1_line = text_2_3.get('end-2lines', END)                                # {MPEG2 H.263 H.264 H.265 IVC VP8 JPEG JPEG2000 BMP PNG TIFF} 순서로 catched_last1_line 변수에 저장,,, 각 시나리오 판단과정에서 활용
-        if catched_last1_line[-3:-2] is '[':            # 맞나???
+        if catched_last1_line[-5:-4] is '':            # 맞나???
+            frequency = catched_last1_line[23:-7].split(',')
             text_2_3.delete('end-5c', 'end-1c')        # 파이썬 버전에따라 프로세스 종료시 서식 초기화 문자가 찍혀나오는 문제가 있으므로 이를 인식하여 삭제하는과정
-        frequency = catched_last1_line[23:-3].split(',')
+        else:
+            frequency = catched_last1_line[23:-3].split(',')
         frq_dict = {c:int(frequency[i]) for i, c in enumerate(codec)}
         frq_dict = sorted(frq_dict.items(), key=operator.itemgetter(1), reverse=True)
 
         for c, v in frq_dict:                                                           # 딥러닝이 판단한 확률 순서대로 복조과정 수행   코덱별로 확률이 높은 순서대로 반복
-
+            print_dual(text_2_3, '%s 코덱의 변형 시나리오 예측중..' % c)
             if c is 'MPEG-2':
                 if subprocess.call("start_code_decryptor.exe %s" % seq1) == 0: ## 시나리오4 header 변조 check
                     print_dual(text_2_3, '2. 시나리오 복조를 시작합니다.')
@@ -593,61 +595,108 @@ def scenario_inv_act():  ### 복조과정   시나리오별로 각 연구실에�
                     print_dual(text_2_3, '복조가 완료되었습니다.')
                     time.sleep(0.2)
                     break
+                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # MPEG-2에 대한 inv xor 판단
+                if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
+                elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
 
             if c is 'H.263':
+                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # H.263에 대한 inv xor 판단
+                if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
+                elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
+
+            if c is 'H.264':
+                if subprocess.call("start_code_decryptor.exe %s" % seq1) == 0: ## 시나리오4 header 변조 check
+                    print_dual(text_2_3, '2. 시나리오 복조를 시작합니다.')
+                    print_dual(text_2_3, 'header 복조 중입니다..')
+                    vid4.changevideo(seq1 + '.restored')
+                    print_dual(text_2_3, '복조가 완료되었습니다.')
+                    time.sleep(0.2)
+                    break
+                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # H.264에 대한 inv xor 판단
+                if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
+                elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
+
+            if c is 'H.265':
+                if subprocess.call("start_code_decryptor.exe %s" % seq1) == 0: ## 시나리오4 header 변조 check
+                    print_dual(text_2_3, '2. 시나리오 복조를 시작합니다.')
+                    print_dual(text_2_3, 'header 복조 중입니다..')
+                    vid4.changevideo(seq1 + '.restored')
+                    print_dual(text_2_3, '복조가 완료되었습니다.')
+                    time.sleep(0.2)
+                    break
+                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # hevc에 대한 inv xor 판단
+                if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
+                elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
+
+            if c is 'IVC':
+                if subprocess.call("start_code_decryptor.exe %s" % seq1) == 0: ## 시나리오4 header 변조 check
+                    print_dual(text_2_3, '2. 시나리오 복조를 시작합니다.')
+                    print_dual(text_2_3, 'header 복조 중입니다..')
+                    vid4.changevideo(seq1 + '.restored')
+                    print_dual(text_2_3, '복조가 완료되었습니다.')
+                    time.sleep(0.2)
+                    break
+                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # IVC에 대한 inv xor 판단
+                if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
+                elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
+
+            if c is 'VP8':
+                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # VP8에 대한 inv xor 판단
+                if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
+                elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
+
+            if c is 'JPEG':
                 if subprocess.call(['python.exe', 'JPEG.py', seq1, '2']) == 0:  ## 시나리오5 JPEG 양자화 테이블 변조 check
                     print_dual(text_2_3, "JPEG 복조 중입니다..")
                     non_block_threding_popen(text_2_3, "python.exe JPEG.py %s %d" % (seq1, 1))
                     vid4.changevideo(seq1.replace('Distorted', 'Restored'))
                     print_dual(text_2_3, '복조가 완료되었습니다.')
                     break
+                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # JPEG에 대한 inv xor 판단
+                if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
+                elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
 
-            if c is 'H.264':
+            if c is 'JPEG2000':
+                if subprocess.call(['python.exe', 'JPEG.py', seq1, '2']) == 0:  ## 시나리오5 JPEG 양자화 테이블 변조 check
+                    print_dual(text_2_3, "JPEG 복조 중입니다..")
+                    non_block_threding_popen(text_2_3, "python.exe JPEG.py %s %d" % (seq1, 1))
+                    vid4.changevideo(seq1.replace('Distorted', 'Restored'))
+                    print_dual(text_2_3, '복조가 완료되었습니다.')
+                    break
+                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # JPEG2000에 대한 inv xor 판단
+                if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
+                elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
+
+            if c is 'BITMAP':
                 if subprocess.call(['python.exe', 'bmp_scenario.py', seq1, '2']) == 0:  ## 시나리오6 BMP 변조 check
                     print_dual(text_2_3, "BMP 복조 중입니다..")
                     non_block_threding_popen(text_2_3, "python.exe bmp_scenario.py %s %d" % (seq1, 1))
                     vid4.changevideo(seq1.replace('Distorted.bmp', 'Restored.bmp'))
                     print_dual(text_2_3, '복조가 완료되었습니다.')
                     break
-
-
-            if c is 'H.265':
+                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # BITMAP에 대한 inv xor 판단
+                if 'inverse' in text_2_3.get('end-2lines', END):
+                    do_inv(text_2_3, seq1);
+                    break  # inv 복조
+                elif 'xor' in text_2_3.get('end-2lines', END):
+                    do_dxor(text_2_3, seq1); break  # xor 복조
+            if c is 'PNG':
                 if subprocess.call(['python.exe', 'png_scenario.py', seq1, '2']) == 0:  ## 시나리오7 PNG 변조 check
                     print_dual(text_2_3, "PNG 복조 중입니다..")
                     non_block_threding_popen(text_2_3, "python.exe png_scenario.py %s %d" % (seq1, 1))
                     vid4.changevideo(seq1.replace('Distorted.png', 'Restored.png'))
                     print_dual(text_2_3, '복조가 완료되었습니다.')
                     break
-
-            if c is 'IVC':
+                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # PNG에 대한 inv xor 판단
+                if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
+                elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
+            if c is 'TIFF':
                 if subprocess.call(['python.exe', 'tiff_scenario.py', seq1, '2']) == 0:  ## 시나리오8 TIFF 변조 check
                     print_dual(text_2_3, "TIFF 복조 중입니다..")
                     non_block_threding_popen(text_2_3, "python.exe tiff_scenario.py %s %d" % (seq1, 1))
                     vid4.changevideo(seq1.replace('Distorted.tiff', 'Restored.tiff'))
                     print_dual(text_2_3, '복조가 완료되었습니다.')
                     break
-
-            if c is 'VP8':
-                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # VP8에 대한 inv xor 판단
-                if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
-                elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
-            if c is 'JPEG':
-                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # JPEG에 대한 inv xor 판단
-                if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
-                elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
-            if c is 'JPEG2000':
-                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # JPEG2000에 대한 inv xor 판단
-                if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
-                elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
-            if c is 'BITMAP':
-                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # BITMAP에 대한 inv xor 판단
-                if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
-                elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
-            if c is 'PNG':
-                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # PNG에 대한 inv xor 판단
-                if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
-                elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
-            if c is 'TIFF':
                 non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # TIFF에 대한 inv xor 판단
                 if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
                 elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
