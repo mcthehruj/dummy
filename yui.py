@@ -396,6 +396,10 @@ def non_block_threding_popen(text, src, encoding='utf-8'):  # stdout를 read로 
     time_write()
     text.see(END)
     canvas_loading.forget()
+    text_ = text.get('end-2lines', END)
+    if text_[-5:-4] is '':
+        text.delete('end-5c', 'end-1c')
+    after_text = text.get('end-2lines', END)
 
 
 #########################################################################################################
@@ -575,13 +579,7 @@ def scenario_inv_act():  ### 복조과정   시나리오별로 각 연구실에�
 
         non_block_threding_popen(text_2_3, "python.exe codec_prediction.py %s" % seq1)           ## 딥러닝으로 코덱 식별          # 11개 코덱 후보에 대한 확률 반환
 
-
-        catched_last1_line = text_2_3.get('end-2lines', END)                                # {MPEG2 H.263 H.264 H.265 IVC VP8 JPEG JPEG2000 BMP PNG TIFF} 순서로 catched_last1_line 변수에 저장,,, 각 시나리오 판단과정에서 활용
-        if catched_last1_line[-5:-4] is '':            # 맞나???
-            frequency = catched_last1_line[23:-7].split(',')
-            text_2_3.delete('end-5c', 'end-1c')        # 파이썬 버전에따라 프로세스 종료시 서식 초기화 문자가 찍혀나오는 문제가 있으므로 이를 인식하여 삭제하는과정
-        else:
-            frequency = catched_last1_line[23:-3].split(',')
+        frequency =  text_2_3.get('end-2lines', END)[23:-3].split(',')                                # {MPEG2 H.263 H.264 H.265 IVC VP8 JPEG JPEG2000 BMP PNG TIFF} 순서로 catched_last1_line 변수에 저장,,, 각 시나리오 판단과정에서 활용
         frq_dict = {c:int(frequency[i]) for i, c in enumerate(codec)}
         frq_dict = sorted(frq_dict.items(), key=operator.itemgetter(1), reverse=True)
 
