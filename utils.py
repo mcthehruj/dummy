@@ -1,3 +1,4 @@
+import sys
 from random import shuffle, randint
 from glob import glob
 import time
@@ -47,13 +48,13 @@ codec = ['MPEG-2', 'H.263', 'H.264', 'H.265', 'IVC', 'VP8', 'JPEG', 'JPEG2000', 
 alphabet = ['a', 'b', 'c', 'd', 'e', 'f']
 scenario_list = ['default', 'inverse', 'xor']
 # Bi-LSTM(Attention) Parameters
-embedding_dim = 64  # 2
-# n_hidden = 32       # 24
+embedding_dim = 128
+n_hidden = 64
 num_classes = len(codec_list)
-# all_bytes_in_a_sentence = 128   # 128
+all_bytes_in_a_sentence = 64
 shift_bytes_in_a_sentence = 1
 num_chars_in_a_word = 1
-dataset = 16        # 32
+dataset = 16
 training_scenario = 3
 test_scenario = 2
 
@@ -126,175 +127,13 @@ class BiLSTM_Attention(nn.Module):
         return self.out(attn_output), attention # model : [batch_size, num_classes], attention : [batch_size, n_step]
 
 
-def scenario_detect(frequency, video, count):           # 시나리오 디텍트 bin 변환부분에서 엄청오래걸리는듯 -정환
-    if frequency.index(max(frequency)) == 0:                                                # MPEG2
-        ssc = [hex2bin('000001b3')]                                                         # 스타트 코드들 저장
-        sec = [hex2bin('000001b5')]
-        gop = [hex2bin('000001b8')]
-        psc = [hex2bin('00000100')]
-        start = False
 
-    elif frequency.index(max(frequency)) == 1:                                              # H.263
-        ssc = [hex2bin('000080'), hex2bin('000081'), hex2bin('000082'), hex2bin('000083')]  # psc
-        # sec = [hex2bin('0000fc'), hex2bin('0000fd'), hex2bin('0000fe'), hex2bin('0000ff')]# eos
-        # gop = [hex2bin('0000f8'), hex2bin('0000f9')]                                      # eosbs
-        # sec = []
-        sec = []                                                                            # gbsc
-        # """
-        for i in range(8, 16):
-            if i >= 11:
-                j = alphabet[i - 11]
-            else:
-                j = str(i)
-            sec.append(hex2bin('0000' + j))
-        # """
-        gop = []
-        psc = []
-        start = True
-
-    elif frequency.index(max(frequency)) == 2:                                              # H.264
-        ssc = [hex2bin('0000000167')]                                                       # sps
-        sec = [hex2bin('0000000168')]                                                       # pps
-        gop = [hex2bin('0000000165'), hex2bin('0000010605')]                                # idr
-        psc = [hex2bin('0000000141')]                                                       # nidr
-        start = False
-
-    elif frequency.index(max(frequency)) == 3:                                              # H.265
-        ssc = [hex2bin('00000001')]                                                           # sps
-        sec = [hex2bin('000003')]                                                           # pps
-        gop = []                                                                            # idr
-        psc = []                                                                            # nidr
-        start = False
-
-    elif frequency.index(max(frequency)) == 4:                                              # IVC
-        ssc = [hex2bin('000001b0')]                                                         # vsc
-        sec = [hex2bin('00000100')]                                                         # vec
-        gop = [hex2bin('000001b2')]                                                         # usc
-        psc = [hex2bin('000001b3')]                                                         # udc
-        start = True
-
-    elif frequency.index(max(frequency)) == 5:                                              # VP8
-        ssc = [hex2bin('1a45dfa3010000000000001f')]                                         # sc
-        sec = [hex2bin('7765626d')]                                                         # webm
-        gop = [hex2bin('1549a96601')]                                                       # ed1
-        psc = [hex2bin('00000000000032')]                                                   # ed2
-        start = True
-
-    elif frequency.index(max(frequency)) == 6:                                              # JPEG
-        ssc = [hex2bin('ffd8')]                                                             # sc
-        sec = [hex2bin('ffc0'), hex2bin('ffc2')]                                            # sof
-        gop = []                                                                            # None
-        psc = []                                                                            # None
-        start = True
-
-    elif frequency.index(max(frequency)) == 7:                                              # JPEG2000
-        ssc = [hex2bin('ff4f')]                                                             # sc
-        sec = [hex2bin('ff90')]                                                             # sot
-        gop = [hex2bin('ff93')]                                                             # sod
-        psc = []                                                                            # siz
-        start = True
-
-    elif frequency.index(max(frequency)) == 8:                                              # BMP
-        ssc = [hex2bin('424d')]                                                             # hd1
-        sec = [hex2bin('28000000'), hex2bin('0c000000'), hex2bin('40000000'), hex2bin('6c000000'), hex2bin('7c000000')]
-        gop = []                                                                            # V3
-        psc = []                                                                            # None
-        start = True
-
-    elif frequency.index(max(frequency)) == 9:                                              # PNG
-        ssc = [hex2bin('89504e47')]                                                         # hd1
-        sec = [hex2bin('49484452')]                                                         # ihdr
-        gop = [hex2bin('49444154')]                                                         # idat
-        psc = []                                                                            # None
-        start = True
-
-    elif frequency.index(max(frequency)) == 10:                                             # TIFF
-        ssc = [hex2bin('4949'), hex2bin('4d4d')]                                            # hd1
-        sec = [hex2bin('002a'), hex2bin('2a00')]                                            # hd2
-        gop = []                                                                            # None
-        psc = []                                                                            # None
-        start = True
-
-    all = list2int(ssc) + list2int(sec) + list2int(gop) + list2int(psc)
-    hr = scenario_search(video, xor_header([ssc, sec, gop, psc], xor_flag=0), start=start)
-    hx = scenario_search(video, xor_header([ssc, sec, gop, psc], xor_flag=1), start=start)
-
-    video.pos = 0
-    video = video.read(video.length).bin
-    hh = [hr, hx]                                                               # 더미 헤더 카운트 추가
-    condition = [True, True]                                                    # 더미 헤더 카운트 추가
-
-    for h in range(len(hh)):                   # h =[hr, hx]
-        if sum(hh[h]) == 0 or hh[h][0] == 0:                                 # 모두 0 이어야 제외하도록 바꿔봄
-            condition[h] = False
-
-        if codec[frequency.index(max(frequency))] == 'BITMAP':
-            if hh[h][0] != 1:       # 헤더의 수가 너무 많으면 믿지 않는다
-                print('too many header > 1', f'(inv{hh[0]} vs xor{hh[1]})')
-                condition[h] = False
-
-        if codec[frequency.index(max(frequency))] == 'H.263':
-            if hh[h][1] >= 10:      # 헤더의 수가 너무 많으면 믿지 않는다
-                print('so many break >= 10', f'(inv{hh[0]} vs xor{hh[1]})')
-                condition[h] = False
-
-        if codec[frequency.index(max(frequency))] == 'TIFF' or codec[frequency.index(max(frequency))] == 'JPEG':        #'JPEG2000', 'PNG', 'TIFF'
-            if h == 0:
-                if hh[h][0] != 1:       # 헤더의 수가 너무 많으면 믿지 않는다
-                    print('too many header > 1', f'(inv{hh[0]} vs xor{hh[1]})')
-                    condition[h] = False
-            else:
-                if hh[h][0] > 2:        # 헤더의 수가 너무 많으면 믿지 않는다
-                    print('too many header > 1', f'(inv{hh[0]} vs xor{hh[1]})')
-                    condition[h] = False
-
-    if sum(condition) == 2:          # 1차로 대충 걸른 후에도 둘다 참이라면 대소비교를 하자
-        if hr < hx:
-            condition[0] = False
-        else:
-            condition[1] = False
-
-    if sum(condition) == 1:                           # 하나 남는다면 확정처리
-        if condition[0] == 1:
-            detected_scenario = 1
-        if condition[1] == 1:
-            detected_scenario = 2
-        # print('# of %s headers ->' % scenario_list[detected_scenario], hh[h])
-        print(scenario_list[detected_scenario], f'found (inv{hh[0]} vs xor{hh[1]})' )
-        if detected_scenario == 1:
-            None        # video = encode(video, 'inv')
-        elif detected_scenario == 2:
-            None        # video = dxor_fast(video, count)             # ui에서 복호화 하자
-        return detected_scenario, video
-
-    # 둘 다 탈락한 경우 렛미트라이로
-    print('Unknown scenario or codec mismatched!', f'(inv{hh[0]} vs xor{hh[1]})' )
-    print('Let me try the second best prediction!')
-    frequency[frequency.index(max(frequency))] -= 100
-    if max(frequency) < -99:
-        print('판별실패!')
-        return   # 모든 코덱 감점먹고 가망없으면 종료
-    print(codec[frequency.index(max(frequency))])
-    video = bitstring.BitStream('0b' + video)
-    detected_scenario, video = scenario_detect(frequency, video, count)
-    return detected_scenario, video
-
-
-def codec_decide(video, mode='image'):
+def codec_decide(video):
     video.pos = 0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    if mode == 'image':                 # 정보를 최대한 많이 받는 게 중요
-        n_hidden = 32
-        all_bytes_in_a_sentence = 128
-    elif mode == 'video':               # 면밀한 분류를 하는 것이 중요
-        n_hidden = 128
-        all_bytes_in_a_sentence = 32
     model = BiLSTM_Attention(n_hidden)
     model.to(device)
-    if mode == 'image':
-        a = torch.load(glob('Bi-LSTM_96.73.pth')[0], map_location=device)
-    elif mode == 'video':
-        a = torch.load(glob('Bi-LSTM_97.94.pth')[0], map_location=device)
+    a = torch.load(glob('Bi-LSTM_98.54.pth')[0], map_location=device)
     model.load_state_dict(a)
     model.to(device)
     frequency = [0] * num_classes       # MPEG-2, H.263, H.264,... 의 예측값의 빈도수를 각각 저장
@@ -869,3 +708,173 @@ def show_matrix(c):
     ax.set_yticklabels(['']+cm_label, fontdict={'fontsize': 14})
     plt.show()
     return
+
+
+#def scenario_detect(frequency, video, count):           # 함수 -> 판단전용 프로세스로 ..
+if __name__ == "__main__":  # def sangmin_deep_predict(mode, src):
+    if (len(sys.argv) != 3):
+        print('입력 인자 오류')
+    if (len(sys.argv) == 3):
+        src = sys.argv[1]
+        video = bitstring.ConstBitStream(filename=src)
+        frequency = [0,0,0,0,0,0,0,0,0,0,0]              # MPEG2 H.263 H.264 H.265 IVC VP8 JPEG JPEG2000 BMP PNG TIFF                      ## sys.argv[2].split('.')
+        for i, aa in enumerate(codec):
+            if aa == sys.argv[2]: frequency[i] = 1
+
+        print('변형 시나리오 inv, xor 판단 중..')                # INV, XOR 두가지만
+
+        if frequency.index(max(frequency)) == 0:                                                # MPEG2
+            ssc = [hex2bin('000001b3')]                                                         # 스타트 코드들 저장
+            sec = [hex2bin('000001b5')]
+            gop = [hex2bin('000001b8')]
+            psc = [hex2bin('00000100')]
+            start = False
+
+        elif frequency.index(max(frequency)) == 1:                                              # H.263
+            ssc = [hex2bin('000080'), hex2bin('000081'), hex2bin('000082'), hex2bin('000083')]  # psc
+            # sec = [hex2bin('0000fc'), hex2bin('0000fd'), hex2bin('0000fe'), hex2bin('0000ff')]# eos
+            # gop = [hex2bin('0000f8'), hex2bin('0000f9')]                                      # eosbs
+            # sec = []
+            sec = []                                                                            # gbsc
+            # """
+            for i in range(8, 16):
+                if i >= 11:
+                    j = alphabet[i - 11]
+                else:
+                    j = str(i)
+                sec.append(hex2bin('0000' + j))
+            # """
+            gop = []
+            psc = []
+            start = True
+
+        elif frequency.index(max(frequency)) == 2:                                              # H.264
+            ssc = [hex2bin('0000000167')]                                                       # sps
+            sec = [hex2bin('0000000168')]                                                       # pps
+            gop = [hex2bin('0000000165'), hex2bin('0000010605')]                                # idr
+            psc = [hex2bin('0000000141')]                                                       # nidr
+            start = False
+
+        elif frequency.index(max(frequency)) == 3:                                              # H.265
+            ssc = [hex2bin('00000001')]                                                           # sps
+            sec = [hex2bin('000003')]                                                           # pps
+            gop = []                                                                            # idr
+            psc = []                                                                            # nidr
+            start = False
+
+        elif frequency.index(max(frequency)) == 4:                                              # IVC
+            ssc = [hex2bin('000001b0')]                                                         # vsc
+            sec = [hex2bin('00000100')]                                                         # vec
+            gop = [hex2bin('000001b2')]                                                         # usc
+            psc = [hex2bin('000001b3')]                                                         # udc
+            start = True
+
+        elif frequency.index(max(frequency)) == 5:                                              # VP8
+            ssc = [hex2bin('1a45dfa3010000000000001f')]                                         # sc
+            sec = [hex2bin('7765626d')]                                                         # webm
+            gop = [hex2bin('1549a96601')]                                                       # ed1
+            psc = [hex2bin('00000000000032')]                                                   # ed2
+            start = True
+
+        elif frequency.index(max(frequency)) == 6:                                              # JPEG
+            ssc = [hex2bin('ffd8')]                                                             # sc
+            sec = [hex2bin('ffc0'), hex2bin('ffc2')]                                            # sof
+            gop = []                                                                            # None
+            psc = []                                                                            # None
+            start = True
+
+        elif frequency.index(max(frequency)) == 7:                                              # JPEG2000
+            ssc = [hex2bin('ff4f')]                                                             # sc
+            sec = [hex2bin('ff90')]                                                             # sot
+            gop = [hex2bin('ff93')]                                                             # sod
+            psc = []                                                                            # siz
+            start = True
+
+        elif frequency.index(max(frequency)) == 8:                                              # BMP
+            ssc = [hex2bin('424d')]                                                             # hd1
+            sec = [hex2bin('28000000'), hex2bin('0c000000'), hex2bin('40000000'), hex2bin('6c000000'), hex2bin('7c000000')]
+            gop = []                                                                            # V3
+            psc = []                                                                            # None
+            start = True
+
+        elif frequency.index(max(frequency)) == 9:                                              # PNG
+            ssc = [hex2bin('89504e47')]                                                         # hd1
+            sec = [hex2bin('49484452')]                                                         # ihdr
+            gop = [hex2bin('49444154')]                                                         # idat
+            psc = []                                                                            # None
+            start = True
+
+        elif frequency.index(max(frequency)) == 10:                                             # TIFF
+            ssc = [hex2bin('4949'), hex2bin('4d4d')]                                            # hd1
+            sec = [hex2bin('002a'), hex2bin('2a00')]                                            # hd2
+            gop = []                                                                            # None
+            psc = []                                                                            # None
+            start = True
+
+        all = list2int(ssc) + list2int(sec) + list2int(gop) + list2int(psc)
+        hr = scenario_search(video, xor_header([ssc, sec, gop, psc], xor_flag=0), start=start)
+        hx = scenario_search(video, xor_header([ssc, sec, gop, psc], xor_flag=1), start=start)
+
+        video.pos = 0
+        video = video.read(video.length).bin
+        hh = [hr, hx]                                                               # 더미 헤더 카운트 추가
+        condition = [True, True]                                                    # 더미 헤더 카운트 추가
+
+        for h in range(len(hh)):                   # h =[hr, hx]
+            if sum(hh[h]) == 0 or hh[h][0] == 0:                                 # 모두 0 이어야 제외하도록 바꿔봄
+                condition[h] = False
+
+            if codec[frequency.index(max(frequency))] == 'BITMAP':
+                if hh[h][0] != 1:       # 헤더의 수가 너무 많으면 믿지 않는다
+                    print('too many header > 1', f'(inv{hh[0]} vs xor{hh[1]})')
+                    condition[h] = False
+
+            if codec[frequency.index(max(frequency))] == 'H.263':
+                if hh[h][1] >= 10:      # 헤더의 수가 너무 많으면 믿지 않는다
+                    print('so many break >= 10', f'(inv{hh[0]} vs xor{hh[1]})')
+                    condition[h] = False
+
+            if codec[frequency.index(max(frequency))] == 'TIFF' or codec[frequency.index(max(frequency))] == 'JPEG':        #'JPEG2000', 'PNG', 'TIFF'
+                if h == 0:
+                    if hh[h][0] != 1:       # 헤더의 수가 너무 많으면 믿지 않는다
+                        print('too many header > 1', f'(inv{hh[0]} vs xor{hh[1]})')
+                        condition[h] = False
+                else:
+                    if hh[h][0] > 2:        # 헤더의 수가 너무 많으면 믿지 않는다
+                        print('too many header > 1', f'(inv{hh[0]} vs xor{hh[1]})')
+                        condition[h] = False
+
+        if sum(condition) == 2:          # 1차로 대충 걸른 후에도 둘다 참이라면 대소비교를 하자
+            if hr < hx:
+                condition[0] = False
+            else:
+                condition[1] = False
+
+        if sum(condition) == 1:                           # 하나 남는다면 확정처리
+            if condition[0] == 1:
+                detected_scenario = 1 # inv
+            if condition[1] == 1:
+                detected_scenario = 2 # xor
+            # print('# of %s headers ->' % scenario_list[detected_scenario], hh[h])
+            print(scenario_list[detected_scenario], f'found (inv{hh[0]} vs xor{hh[1]})' )
+            if detected_scenario == 1:
+                None        # video = encode(video, 'inv')
+            elif detected_scenario == 2:
+                None        # video = dxor_fast(video, count)             # ui에서 복호화 하자
+            print('변형 시나리오는 %s 입니다.' % scenario_list[detected_scenario])
+            sys.exit(detected_scenario)
+
+        # # 둘 다 탈락한 경우 렛미트라이로
+        # print('Unknown scenario or codec mismatched!', f'(inv{hh[0]} vs xor{hh[1]})' )
+        # print('Let me try the second best prediction!')
+        # frequency[frequency.index(max(frequency))] -= 100
+        # if max(frequency) < -99:
+        #     print('판별실패!')
+        #     return   # 모든 코덱 감점먹고 가망없으면 종료
+        # print(codec[frequency.index(max(frequency))])
+        # video = bitstring.BitStream('0b' + video)
+        # detected_scenario, video = scenario_detect(frequency, video, count)
+
+        # # 둘 다 탈락한 경우 반환값 0
+    sys.exit(0)
+
