@@ -49,7 +49,6 @@ class VideoCaptureYUV:
 
 
 class LoadDisplay(object):  # ui 영상창 클래스
-    # 추가해야할 디스플레이 클래스 기능: 프로그래스바, 모든비디오시퀀스가 33ms의 프레임레이트를 가지는문제, 드래그시 클릭되는 문제
     pausedisplay = 1  # 클래스간 공통변수
     progressbar = 0
 
@@ -142,7 +141,7 @@ class LoadDisplay(object):  # ui 영상창 클래스
         self.name = os.path.splitext(self.video_source)[1]
 
         if not self.vid.isOpened():  # 열리지 않았다면
-            if os.path.isfile(self.video_source):  ## 영상 존재   png,  YUV 케이스?
+            if os.path.isfile(self.video_source):  # 영상이이 존재  png,  YUV 케이스?
                 print('(debug) imread로 시도')
                 if isHangul(self.video_source): print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "(debug) cv2.imread png: 경로에 한글 주소가 포함되어 있어 디코딩 불가"); return
                 self.frame = cv2.imread(self.video_source)
@@ -171,7 +170,6 @@ class LoadDisplay(object):  # ui 영상창 클래스
                         print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "(debug) YUV 열기 완료, 이미지는 보이나 인코딩된 상태가 아니기 때문에 시나리오 적용 불가")
                         return set_srctext_and_return(self.video_source)
                     else:
-                        # print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "(debug) 무엇을 연것?")
                         self.vid = cv2.VideoCapture('errd2.png')
                         print('오류디스플레이 출력')
                         ret, self.frame = self.get_frame()
@@ -182,22 +180,22 @@ class LoadDisplay(object):  # ui 영상창 클래스
                 self.video_source = ""
                 return set_srctext_and_return('')
 
-        else:  # vid.isOpened True 일때:  영상 정보를 얻자
-            ret, self.frame = self.get_frame()  # 동영상의 초기 1프레임 얻어 띄우기
-            if self.frame is None:  ## 파일은 존재하지만 디코딩이 안됐단뜻    ## IVC 디코더로 시도
+        else:  # vid.isOpened True 일때: 영상 정보를 얻자
+            ret, self.frame = self.get_frame()  # 이미지/동영상의 첫 프레임을 출력
+            if self.frame is None:  # 파일은 존재하지만 디코딩이 실패 -> IVC 디코더로 시도
                 self.vid.release()
                 print("IVC 디코더로 시도")
-                subprocess.run("ldecod_ivc.exe %s 1t_youcandelete_%s" % (self.video_source, os.path.basename(self.video_source)), stdout=subprocess.DEVNULL)  # 현재폴더에 재인코딩된 임시파일 생성
-                yuv_src = '1t_youcandelete_' + os.path.basename(self.video_source)
+                subprocess.run("ldecod_ivc.exe %s tmp_file_%s" % (self.video_source, os.path.basename(self.video_source)), stdout=subprocess.DEVNULL)  # 현재폴더에 재인코딩된 임시파일 생성
+                yuv_src = 'tmp_file_' + os.path.basename(self.video_source)
                 subprocess.run("ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i %s -c:v hevc -y %s.hevc" % (yuv_src, os.path.splitext(yuv_src)[0]), stdout=subprocess.DEVNULL)
                 # if os.path.isfile(os.path.splitext(yuv_src)[0] + '.hevc'): 파일이존재하지않을이유는없을걸
                 if os.path.getsize(os.path.splitext(yuv_src)[0] + '.hevc') > 1:
                     self.vid = cv2.VideoCapture(os.path.splitext(yuv_src)[0] + '.hevc')
-                else:
+                else:       # IVC 디코더로 디코딩 불가시 시퀀스는 에러(변조)영상 화면상에 에러 메세지 띄우기
                     self.vid = cv2.VideoCapture('errd1.png')
-                    print('오류디스플레이 출력')  ## ivc디코더로도 안뜬다면 시퀀스는 에러영상 일것임     화면상에 에러 메세지로 디스플레이기능 넣기
+                    print('오류디스플레이 출력')
                 ret, self.frame = self.get_frame()
-            self.frame_count = self.vid.get(cv2.CAP_PROP_FRAME_COUNT)  ##### 정리좀 할것
+            self.frame_count = self.vid.get(cv2.CAP_PROP_FRAME_COUNT)
             if self.frame_count < 1 or self.frame_count > 30000:  # 음수거나 너무크면
                 self.frame_count = 300
                 self.vid.set(7, 300)
@@ -220,14 +218,14 @@ class LoadDisplay(object):  # ui 영상창 클래스
     def get_frame(self):
         if self.vid.isOpened():  # self.vid.set(cv2.CV_CAP_PROP_POS_FRAMES, frame_number - 1)
             try:
-                ret, frame = self.vid.read()  # cv가 코덱모를경우 에러뿜음
+                ret, frame = self.vid.read()  # cv가 코덱인식 못할 경우 에러
             except:
                 None
             LoadDisplay.progressbar = self.vid.get(cv2.CAP_PROP_POS_FRAMES)
             if ret:
                 return 2, cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # success
             else:
-                self.vid = cv2.VideoCapture(self.video_source)  # opencv 이상한게 프레임 재생 할당량만 채우면 종료되버리네 ㄷ  bit은 오류날듯
+                self.vid = cv2.VideoCapture(self.video_source)  # opencv 프레임 재생 할당량만 채우면 종료
                 LoadDisplay.pausedisplay = 1
                 return 3, None  # 시퀀스 끝 빈 프레임
         else:
@@ -243,7 +241,7 @@ class LoadDisplay(object):  # ui 영상창 클래스
             if self.canvas.master.winfo_name() == '!labelframe':  # labelframe2는 우측 디스플레이임, 즉 좌측디스플레이 기준으로 슬라이드가 움직인다
                 self.canvas.master.master.children['!scale'].set((cur / self.frame_count) * 100)
 
-        if ret == 2:  # 일반 재생 시
+        if ret == 2:  # 일반 재생시
             self.frame = temframe
             temframe = cv2.resize(temframe, None, fx=self.zoom_x, fy=self.zoom_y, interpolation=cv2.INTER_LINEAR)
             self.photo = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(temframe))
@@ -310,7 +308,7 @@ def set_slider(slidername, *args):
 
 
 def print_dual(text, aa):
-    if aa == '': return;
+    if aa == '': return
     now = datetime.now(); strt = '[%d.%02d.%02d %d:%02d:%02d] ' % (now.year, now.month, now.day, now.hour, now.minute, now.second)
     print(strt, end='')
     text.insert(END, strt)
@@ -356,7 +354,7 @@ def do_dxor(text, seq):
     print_dual(text, '복조가 완료되었습니다.')
 
 
-def non_block_threding_popen(text, src, encoding='utf-8'):  # stdout를 read로 읽으면 먹통되는 현상 고치는 함수
+def non_block_threading_popen(text, src, encoding='utf-8'):  # stdout를 read로 읽으면 먹통되는 현상을 고치는 함수
     from queue import Queue
     def enqueue_output(out, queue):
         try:
@@ -402,27 +400,25 @@ def non_block_threding_popen(text, src, encoding='utf-8'):  # stdout를 read로 
     after_text = text.get('end-2lines', END)
 
 
+
 #########################################################################################################
+#   변조과정
+# "변조 시나리오"                 가능 코덱
+# "Scenario-1 inverse"          모두
+# "Scenario-2 xor"              모두
+# "Scenario-3 더미-히든"          mpeg2 263 264 hevc ivc        (vp8 제외)
+# "Scenario-4 start code"       mpeg2 264 hevc ivc            (vp8 263 제외)
+# "Scenario-5 jpg, j2k"         jpg j2k
+# "Scenario-6 bmp"              bmp
+# "Scenario-7 png"              png
+# "Scenario-8 tiff"             tiff
+# * vp8 = webm , ivc = bit
 #########################################################################################################
-#########################################################################################################
-#########################################################################################################
+
 def srcs_g(a):
     srcs_g.count = a
 
-
-
-#                           가능 코덱
-# "Scenario-1 inverse"          모두
-# "Scenario-2 xor"              모두
-# "Scenario-3 더미-히든"         mpeg2 263 264 hevc ivc        (vp8 제외)
-# "Scenario-4 start code"      mpeg2 264 hevc ivc            (vp8 263 제외)
-# "Scenario-5 jpg, j2k"        jpg j2k
-# "Scenario-6 bmp"             bmp
-# "Scenario-7 png"             png
-# "Scenario-8 tiff"            tiff
-# * vp8 = webm , ivc = bit
-
-def scenario_act(event):  ### 변조과정 ###                  # 이 함수는 input stream 버튼을 눌러도 호출되고 combobox를 선택해도 호출됨 event 인자의 차이
+def scenario_act(event):            # 이 함수는 input stream 버튼을 눌러도 호출되고 combobox를 선택해도 호출됨 event 인자의 차이
     if event == 'askmode':          # input stream 버튼을 통한 접근시
         srcs_g.count = askopenfilenames(initialdir="", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.")
         srcs = srcs_g.count
@@ -479,19 +475,19 @@ def scenario_act(event):  ### 변조과정 ###                  # 이 함수는 
             vid2.changevideo(src_plus_name + '_xor' + ext)
             print_dual(text_1_3, '변조가 완료되었습니다.')
 
-        elif 'Scenario-3' in event.widget.get():  ## 시나리오3 더미-히든 변조               현재 mpeg2,263,264,265,IVC 만 지원 됨
+        elif 'Scenario-3' in event.widget.get():  ## 시나리오3 dummy-hidden 변조
             if ext in 'webm': print_dual(text_1_3, 'vp8 은 더미-히든 변조를 지원하지 않습니다'); continue
             if ext in ['jpg', 'j2k', 'bmp', 'tiff', 'png']: print_dual(text_1_3, '이미지 포멧은 더미-히든 변조를 지원하지 않습니다'); continue
             print_dual(text_1_3, '숨길 영상을 추가로 선택 해 주세요')
             seq2 = askopenfilename(initialdir="", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.")  # 더미-히든 변조과정에 필요한 추가시퀀스(히든) 열기
             if seq2 == '': print_dual(text_1_3, '추가 영상을 선택하지 않아 취소되었습니다'); continue
             print_dual(text_1_3, '더미-히든 변조 중입니다..')
-            non_block_threding_popen(text_1_3, "python.exe dummy_hidden.py %s %s" % (seq1, seq2))  # 더미-히든 시나리오 변조 실행
+            non_block_threading_popen(text_1_3, "python.exe dummy_hidden.py %s %s" % (seq1, seq2))  # 더미-히든 시나리오 변조 실행
             seq3 = os.path.splitext(seq1)[0] + '_' + os.path.basename(seq2)
             vid2.changevideo(seq3) if os.path.isfile(seq3) else print_dual(text_1_3, '%s 존재하지 않음' % seq3)  # 더미-히든 실행 후 완료된 파일 vid2에 띄우기
             print_dual(text_1_3, '변조가 완료되었습니다.')
 
-        elif 'Scenario-4' in event.widget.get():  ## 시나리오4 header 변조
+        elif 'Scenario-4' in event.widget.get():  ## 시나리오4 start code 변조
             if ext in ['webm', 'bit']: print_dual(text_1_3, 'vp8 은 header변조를 지원하지 않습니다'); continue
             if ext in ['jpg', 'j2k', 'bmp', 'tiff', 'png']: print_dual(text_1_3, '이미지 포멧은 header변조를 지원하지 않습니다'); continue
             print_dual(text_1_3, 'header 변조 중입니다..')
@@ -502,7 +498,7 @@ def scenario_act(event):  ### 변조과정 ###                  # 이 함수는 
             print_dual(text_1_3, 'JPEG 양자화 테이블 변조 중입니다.')
             if ext in ['.jpg', '.j2k']:
                 try:
-                    non_block_threding_popen(text_1_3, "python.exe JPEG.py %s %d" % (seq1, 0))
+                    non_block_threading_popen(text_1_3, "python.exe JPEG.py %s %d" % (seq1, 0))
                     seq2 = src_plus_name + '_Distorted' + ext
                     vid2.changevideo(seq2) if os.path.isfile(seq2) else print_dual(text_1_3, '%s 존재하지 않음' % seq2)
                 except:
@@ -514,7 +510,7 @@ def scenario_act(event):  ### 변조과정 ###                  # 이 함수는 
             print_dual(text_1_3, 'BMP 변조 중입니다..')
             if ext in ['.bmp']:
                 try:
-                    non_block_threding_popen(text_1_3, "python.exe bmp_scenario.py %s %d" % (seq1, 0))
+                    non_block_threading_popen(text_1_3, "python.exe bmp_scenario.py %s %d" % (seq1, 0))
                     seq2 = src_plus_name + '_Distorted' + ext
                     vid2.changevideo(seq2) if os.path.isfile(seq2) else print_dual(text_1_3, '%s 존재하지 않음' % seq2)
                 except:
@@ -526,7 +522,7 @@ def scenario_act(event):  ### 변조과정 ###                  # 이 함수는 
             print_dual(text_1_3, 'PNG 변조 중입니다..')
             if ext in ['.png']:
                 try:
-                    non_block_threding_popen(text_1_3, "python.exe png_scenario.py %s %d" % (seq1, 0))
+                    non_block_threading_popen(text_1_3, "python.exe png_scenario.py %s %d" % (seq1, 0))
                     seq2 = src_plus_name + '_Distorted' + ext
                     vid2.changevideo(seq2) if os.path.isfile(seq2) else print_dual(text_1_3, '%s 존재하지 않음' % seq2)
                 except:
@@ -538,7 +534,7 @@ def scenario_act(event):  ### 변조과정 ###                  # 이 함수는 
             print_dual(text_1_3, 'TIFF 변조 중입니다..')
             if ext in ['.tiff']:
                 try:
-                    non_block_threding_popen(text_1_3, "python.exe tiff_scenario.py %s %d" % (seq1, 0))
+                    non_block_threading_popen(text_1_3, "python.exe tiff_scenario.py %s %d" % (seq1, 0))
                     seq2 = src_plus_name + '_Distorted' + ext
                     vid2.changevideo(seq2) if os.path.isfile(seq2) else print_dual(text_1_3, '%s 존재하지 않음' % seq2)
                 except:
@@ -548,16 +544,16 @@ def scenario_act(event):  ### 변조과정 ###                  # 이 함수는 
 
         print_dual(text_1_3, "　")
         window.focus_force()
-        # winsound.PlaySound('SystemQuestion', winsound.SND_ALIAS)  # 사운드에 딜레이가 함께 있다.. ㄷㄷ
+        # winsound.PlaySound('SystemQuestion', winsound.SND_ALIAS)  # 사운드에 딜레이가 포함되어 있음
         # time.sleep(0.5)
 
 
 #########################################################################################################
-#########################################################################################################
-#########################################################################################################
+#   복조과정
 # 1. 어떤 시나리오가 적용되어있는지 판단
 # 2. 판단된 시나리오로 각 연구실의 복조과정 실행
-def scenario_inv_act():  ### 복조과정   시나리오별로 각 연구실에서 작성한 win32어플리케이션을 인자전달해서 복조 하도록 해주세요
+#########################################################################################################
+def scenario_inv_act():
     srcs = askopenfilenames(initialdir="", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.")
     if srcs == '':   # 사용자가 ask 창을 캔슬 누른 경우 아웃
         return
@@ -570,20 +566,20 @@ def scenario_inv_act():  ### 복조과정   시나리오별로 각 연구실에�
         print_dual(text_2_3, f'({iii + 1}/{len(srcs)}) {name}{ext}')
         vid3.changevideo(seq1)  # 입력영상 띄우기
 
-        print('(d) 더미히든여부확인');  non_block_threding_popen(text_2_3, "python.exe dummy_hidden.py %s" % seq1)         # 1.1 더미-히든 판별모드 실행 (임시 하드코딩)
-        if 'hidden' in text_2_3.get('end-2lines', END):                                                                 # 시나리오 3       # 더미-히든 복조
+        print('(d) 더미히든여부확인');  non_block_threading_popen(text_2_3, "python.exe dummy_hidden.py %s" % seq1)     # dummy-hidden 판별
+        if 'hidden' in text_2_3.get('end-2lines', END):                                                              # dummy-hidden 복조
             print_dual(text_2_3, "dummy-hidden restore start")
-            non_block_threding_popen(text_2_3, "python.exe dummy_hidden.py %s %s" % (seq1, '1'))                        # 더미-히든 시나리오 복조모드 실행
-            vid4.changevideo(src_plus_name + '_restored' + ext)                                                         # 복조된 _restored 파일 디스플레이
+            non_block_threading_popen(text_2_3, "python.exe dummy_hidden.py %s %s" % (seq1, '1'))
+            vid4.changevideo(src_plus_name + '_restored' + ext)                                                      # 복조된 _restored 파일 디스플레이
             print_dual(text_2_3, "dummy-hidden restore complete") ; continue
 
-        non_block_threding_popen(text_2_3, "python.exe codec_prediction.py %s" % seq1)           ## 딥러닝으로 코덱 식별          # 11개 코덱 후보에 대한 확률 반환
+        non_block_threading_popen(text_2_3, "python.exe codec_prediction.py %s" % seq1)         # 딥러닝으로 코덱 식별          # 11개 코덱 후보에 대한 확률 반환
 
-        frequency =  text_2_3.get('end-2lines', END)[23:-3].split(',')                                # {MPEG2 H.263 H.264 H.265 IVC VP8 JPEG JPEG2000 BMP PNG TIFF} 순서로 catched_last1_line 변수에 저장,,, 각 시나리오 판단과정에서 활용
+        frequency =  text_2_3.get('end-2lines', END)[23:-3].split(',')                          # {MPEG2 H.263 H.264 H.265 IVC VP8 JPEG JPEG2000 BMP PNG TIFF} 순서로 catched_last1_line 변수에 저장,,, 각 시나리오 판단과정에서 활용
         frq_dict = {c:int(frequency[i]) for i, c in enumerate(codec)}
         frq_dict = sorted(frq_dict.items(), key=operator.itemgetter(1), reverse=True)
 
-        for c, v in frq_dict:                                                           # 딥러닝이 판단한 확률 순서대로 복조과정 수행   코덱별로 확률이 높은 순서대로 반복
+        for c, v in frq_dict:                       # 코덱별로 확률이 높은 순서대로 복조과정 반복
             print_dual(text_2_3, '%s 코덱의 변형 시나리오 예측중..' % c)
             if c == 'MPEG-2':
                 if subprocess.call("start_code_decryptor.exe %s" % seq1) == 0: ## 시나리오4 header 변조 check
@@ -593,120 +589,111 @@ def scenario_inv_act():  ### 복조과정   시나리오별로 각 연구실에�
                     print_dual(text_2_3, '복조가 완료되었습니다.')
                     time.sleep(0.2)
                     break
-                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # MPEG-2에 대한 inv xor 판단
+                non_block_threading_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))    # MPEG-2에 대한 inv xor 판단
                 if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
                 elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
 
             if c == 'H.263':
-                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # H.263에 대한 inv xor 판단
+                non_block_threading_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))    # H.263에 대한 inv xor 판단
                 if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
                 elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
 
             if c == 'H.264':
-                if subprocess.call("start_code_decryptor.exe %s" % seq1) == 0: ## 시나리오4 header 변조 check
+                if subprocess.call("start_code_decryptor.exe %s" % seq1) == 0:                  # 시나리오4 start code 변조 check
                     print_dual(text_2_3, '2. 시나리오 복조를 시작합니다.')
                     print_dual(text_2_3, 'header 복조 중입니다..')
                     vid4.changevideo(seq1 + '.restored')
                     print_dual(text_2_3, '복조가 완료되었습니다.')
                     time.sleep(0.2)
                     break
-                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # H.264에 대한 inv xor 판단
+                non_block_threading_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))    # H.264에 대한 inv xor 판단
                 if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
                 elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
 
             if c == 'H.265':
-                if subprocess.call("start_code_decryptor.exe %s" % seq1) == 0: ## 시나리오4 header 변조 check
+                if subprocess.call("start_code_decryptor.exe %s" % seq1) == 0:                  # 시나리오4 start code 변조 check
                     print_dual(text_2_3, '2. 시나리오 복조를 시작합니다.')
                     print_dual(text_2_3, 'header 복조 중입니다..')
                     vid4.changevideo(seq1 + '.restored')
                     print_dual(text_2_3, '복조가 완료되었습니다.')
                     time.sleep(0.2)
                     break
-                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # hevc에 대한 inv xor 판단
+                non_block_threading_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))    # hevc에 대한 inv xor 판단
                 if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
                 elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
 
             if c == 'IVC':
-                if subprocess.call("start_code_decryptor.exe %s" % seq1) == 0: ## 시나리오4 header 변조 check
+                if subprocess.call("start_code_decryptor.exe %s" % seq1) == 0:                  # 시나리오4 start code 변조 check
                     print_dual(text_2_3, '2. 시나리오 복조를 시작합니다.')
                     print_dual(text_2_3, 'header 복조 중입니다..')
                     vid4.changevideo(seq1 + '.restored')
                     print_dual(text_2_3, '복조가 완료되었습니다.')
                     time.sleep(0.2)
                     break
-                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # IVC에 대한 inv xor 판단
+                non_block_threading_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))    # IVC에 대한 inv xor 판단
                 if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
                 elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
 
             if c == 'VP8':
-                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # VP8에 대한 inv xor 판단
+                non_block_threading_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))    # VP8에 대한 inv xor 판단
                 if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
                 elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
 
             if c == 'JPEG':
-                if subprocess.call(['python.exe', 'JPEG.py', seq1, '2']) == 0:  ## 시나리오5 JPEG 양자화 테이블 변조 check
+                if subprocess.call(['python.exe', 'JPEG.py', seq1, '2']) == 0:                  # 시나리오5 JPEG/JPEG2000 양자화 테이블 변조 check
                     print_dual(text_2_3, "JPEG 복조 중입니다..")
-                    non_block_threding_popen(text_2_3, "python.exe JPEG.py %s %d" % (seq1, 1))
+                    non_block_threading_popen(text_2_3, "python.exe JPEG.py %s %d" % (seq1, 1))
                     vid4.changevideo(seq1.replace('Distorted', 'Restored'))
                     print_dual(text_2_3, '복조가 완료되었습니다.')
                     break
-                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # JPEG에 대한 inv xor 판단
+                non_block_threading_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))    # JPEG에 대한 inv xor 판단
                 if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
                 elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
 
             if c == 'JPEG2000':
-                if subprocess.call(['python.exe', 'JPEG.py', seq1, '2']) == 0:  ## 시나리오5 JPEG 양자화 테이블 변조 check
+                if subprocess.call(['python.exe', 'JPEG.py', seq1, '2']) == 0:                  # 시나리오5 JPEG/JPEG2000 양자화 테이블 변조 check
                     print_dual(text_2_3, "JPEG 복조 중입니다..")
-                    non_block_threding_popen(text_2_3, "python.exe JPEG.py %s %d" % (seq1, 1))
+                    non_block_threading_popen(text_2_3, "python.exe JPEG.py %s %d" % (seq1, 1))
                     vid4.changevideo(seq1.replace('Distorted', 'Restored'))
                     print_dual(text_2_3, '복조가 완료되었습니다.')
                     break
-                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # JPEG2000에 대한 inv xor 판단
+                non_block_threading_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))    # JPEG2000에 대한 inv xor 판단
                 if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
                 elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
 
             if c == 'BITMAP':
-                if subprocess.call(['python.exe', 'bmp_scenario.py', seq1, '2']) == 0:  ## 시나리오6 BMP 변조 check
+                if subprocess.call(['python.exe', 'bmp_scenario.py', seq1, '2']) == 0:          # 시나리오6 BMP 변조 check
                     print_dual(text_2_3, "BMP 복조 중입니다..")
-                    non_block_threding_popen(text_2_3, "python.exe bmp_scenario.py %s %d" % (seq1, 1))
+                    non_block_threading_popen(text_2_3, "python.exe bmp_scenario.py %s %d" % (seq1, 1))
                     vid4.changevideo(seq1.replace('Distorted.bmp', 'Restored.bmp'))
                     print_dual(text_2_3, '복조가 완료되었습니다.')
                     break
-                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # BITMAP에 대한 inv xor 판단
+                non_block_threading_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))    # BITMAP에 대한 inv xor 판단
                 if 'inverse' in text_2_3.get('end-2lines', END):
                     do_inv(text_2_3, seq1);
                     break  # inv 복조
                 elif 'xor' in text_2_3.get('end-2lines', END):
                     do_dxor(text_2_3, seq1); break  # xor 복조
             if c == 'PNG':
-                if subprocess.call(['python.exe', 'png_scenario.py', seq1, '2']) == 0:  ## 시나리오7 PNG 변조 check
+                if subprocess.call(['python.exe', 'png_scenario.py', seq1, '2']) == 0:          # 시나리오7 PNG 변조 check
                     print_dual(text_2_3, "PNG 복조 중입니다..")
-                    non_block_threding_popen(text_2_3, "python.exe png_scenario.py %s %d" % (seq1, 1))
+                    non_block_threading_popen(text_2_3, "python.exe png_scenario.py %s %d" % (seq1, 1))
                     vid4.changevideo(seq1.replace('Distorted.png', 'Restored.png'))
                     print_dual(text_2_3, '복조가 완료되었습니다.')
                     break
-                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # PNG에 대한 inv xor 판단
+                non_block_threading_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))    # PNG에 대한 inv xor 판단
                 if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
                 elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
             if c == 'TIFF':
-                if subprocess.call(['python.exe', 'tiff_scenario.py', seq1, '2']) == 0:  ## 시나리오8 TIFF 변조 check
+                if subprocess.call(['python.exe', 'tiff_scenario.py', seq1, '2']) == 0:         # 시나리오8 TIFF 변조 check
                     print_dual(text_2_3, "TIFF 복조 중입니다..")
-                    non_block_threding_popen(text_2_3, "python.exe tiff_scenario.py %s %d" % (seq1, 1))
+                    non_block_threading_popen(text_2_3, "python.exe tiff_scenario.py %s %d" % (seq1, 1))
                     vid4.changevideo(seq1.replace('Distorted.tiff', 'Restored.tiff'))
                     print_dual(text_2_3, '복조가 완료되었습니다.')
                     break
-                non_block_threding_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))     # TIFF에 대한 inv xor 판단
+                non_block_threading_popen(text_2_3, "python.exe utils.py %s %s" % (seq1, c))    # TIFF에 대한 inv xor 판단
                 if 'inverse' in text_2_3.get('end-2lines', END): do_inv(text_2_3, seq1); break  # inv 복조
                 elif 'xor' in text_2_3.get('end-2lines', END):  do_dxor(text_2_3, seq1); break  # xor 복조
-
-
-
-
-
-
-
-            #else:
-            #    print_dual(text_2_3, '%s <- 이 마지막 메세지를 인식하지 못했기에 복조 시나리오로 넘어가지 못했습니다. 혹은 복조 프로세스가 오류종료 하였음' % catched_last1_line[:-2])
 
         print_dual(text_2_3, " ")           # 파일간 사이 공백
         window.focus_force()
@@ -714,10 +701,9 @@ def scenario_inv_act():  ### 복조과정   시나리오별로 각 연구실에�
         time.sleep(0.2)
 
 
-# 여기까지 복조과정
 #########################################################################################################
+#   UI 관련 코드
 #########################################################################################################
-# 이후 UI 관련 코드
 def release(event):
     def ddd(vid, slider):
         current = int(vid.vid.get(1))
@@ -758,7 +744,7 @@ window.iconbitmap('ho.ico')
 window.geometry("845x705+900+160")
 
 style = tkinter.ttk.Style()  # https://wiki.tcl-lang.org/page/List+of+ttk+Themes
-style.theme_create("yummy", parent='winnative', settings={  # 커스텀 스타일을 만들어야만 탭배경색이 변경가능하데
+style.theme_create("yummy", parent='winnative', settings={  # 커스텀 스타일을 만들어야만 탭배경색이 변경가능
     "TNotebook": {"configure": {"tabmargins": [7, 5, 0, 0]}},
     "TNotebook.Tab": {
         "configure": {"padding": [14, 5], "background": '#cfdfc5'},  # 흰국방색
@@ -853,7 +839,7 @@ yscrollbar.config(command=text_2_3.yview)
 
 combo_1_2 = Combobox(frame1)
 combo_1_2['values'] = ("Scenario-1 inverse", "Scenario-2 xor", "Scenario-3 더미-히든", "Scenario-4 start code", "Scenario-5 jpg, j2k", "Scenario-6 bmp", "Scenario-7 png", "Scenario-8 tiff")
-combo_1_2.bind("<<ComboboxSelected>>", lambda event: canvas_loading.show() or scenario_act(event) or window.focus_force() or canvas_loading.forget())  # 함수 주소 전달인데 or이 먹히네...
+combo_1_2.bind("<<ComboboxSelected>>", lambda event: canvas_loading.show() or scenario_act(event) or window.focus_force() or canvas_loading.forget())  # 함수 주소 전달
 combo_1_2.current(0)  # set the selected item
 
 # combo_1_1.place(x=150, y=0)
@@ -948,10 +934,10 @@ class canvas_loding_class:
             None
         else:
             try:
-                ret, self.temframe = self.vid.read()  # cv가 코덱모를경우 에러뿜음
+                ret, self.temframe = self.vid.read()  # cv가 코덱인식 못할 경우 에러
                 cv2.cvtColor(self.temframe, cv2.COLOR_BGR2RGB)
             except:
-                self.vid = cv2.VideoCapture('load_lgreen.gif')  # opencv 이상한게 프레임 재생 할당량만 채우면 종료되버리네 ㄷ  bit은 오류날듯
+                self.vid = cv2.VideoCapture('load_lgreen.gif')  # opencv 프레임 재생 할당량만 채우면 종료
                 ret, self.temframe = self.vid.read()
             self.photo = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.temframe))
             self.canvas_loadingimage.create_image(0, 0, image=self.photo, anchor=tkinter.NW)
@@ -971,8 +957,8 @@ class canvas_loding_class:
 
 canvas_loading = canvas_loding_class(290, 290, 250, 200)
 
-for filename in glob("1t_youcandelete*"): os.remove(filename)
+for filename in glob("tmp_file*"): os.remove(filename)
 srcs_g('')  # 전역변수 초기화
 
 window.mainloop()
-for filename in glob("1t_youcandelete*"): os.remove(filename)
+for filename in glob("tmp_file*"): os.remove(filename)

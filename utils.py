@@ -1,7 +1,6 @@
 import sys
 from random import shuffle, randint
 from glob import glob
-import time
 import bitstring
 import numpy as np
 import torch
@@ -19,31 +18,7 @@ def list2int(list):
     return int(len(list) != 0)
 
 
-def primeSieve(sieveSize):
-    # creating Sieve (0~n까지의 slot)
-    sieve = [True] * (sieveSize+1)
-    # 0과 1은 소수가 아니므로 제외
-    sieve[0] = False
-    sieve[1] = False
-    # 2부터 (루트 n) + 1까지의 숫자를 탐색
-    for i in range(2,int(math.sqrt(sieveSize))+1):
-        # i가 소수가 아니면 pass
-        if sieve[i] == False:
-            continue
-        # i가 소수라면 i*i~n까지 숫자 가운데 i의 배수를
-        # 소수에서 제외
-        for pointer in range(i**2, sieveSize+1, i):
-            sieve[pointer] = False
-    primes = []
-    # sieve 리스트에서 True인 것이 소수이므로
-    # True인 값의 인덱스를 결과로 저장
-    for i in range(sieveSize+1):
-        if sieve[i] == True:
-            primes.append(i)
-    return primes
-
-
-codec_list = ['.m2v', '.h263', '.264', '.mp4', '.bit', '.webm', '.jpg', '.j2k', '.bmp', '.png', '.tiff']
+codec_list = ['.m2v', '.h263', '.264', '.hevc', '.bit', '.webm', '.jpg', '.j2k', '.bmp', '.png', '.tiff']
 codec = ['MPEG-2', 'H.263', 'H.264', 'H.265', 'IVC', 'VP8', 'JPEG', 'JPEG2000', 'BITMAP', 'PNG', 'TIFF']
 alphabet = ['a', 'b', 'c', 'd', 'e', 'f']
 scenario_list = ['default', 'inverse', 'xor']
@@ -55,14 +30,10 @@ all_bytes_in_a_sentence = 64
 shift_bytes_in_a_sentence = 1
 num_chars_in_a_word = 1
 dataset = 16
-training_scenario = 3
-test_scenario = 2
 
 # Word List for Att-BLSTM
 word_dict = {}
 hexList = []
-# ind = 1
-# print(sentences[ind], labels[ind])
 for i in range(10):
     hexList.append(str(i))
 for i in alphabet:
@@ -75,10 +46,8 @@ for i in range(16):
             word_dict[hexList[i]+hexList[j]+hexList[k]] = (16 ** 2) * i + 16 * j + k
             for l in range(16):
                 word_dict[hexList[i]+hexList[j]+hexList[k]+hexList[l]] = (16 ** 3) * i + (16 ** 2) * j + 16 * k + l
-                # '''
-# print(sentences[ind], labels[ind])
-vocab_size = len(word_dict)
 
+vocab_size = len(word_dict)
 
 # Network
 class BiLSTM_Attention(nn.Module):
@@ -112,8 +81,8 @@ class BiLSTM_Attention(nn.Module):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         input = self.embedding(X).to(device) # input : [batch_size, len_seq, embedding_dim]
         # print(input[ind])
-        input = input.permute(1, 0, 2) # input : [len_seq, batch_size, embedding_dim]
-
+        input = input.permute(1, 0, 2)
+        # input : [len_seq, batch_size, embedding_dim]
         hidden_state = Variable(torch.zeros(1*2, len(X), self.n_hidden)).to(device)
         # [num_layers(=1) * num_directions(=2), batch_size, n_hidden]
         cell_state = Variable(torch.zeros(1*2, len(X), self.n_hidden)).to(device)
@@ -133,7 +102,7 @@ def codec_decide(video):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = BiLSTM_Attention(n_hidden)
     model.to(device)
-    a = torch.load(glob('Bi-LSTM_98.54.pth')[0], map_location=device)
+    a = torch.load(glob('Bi-LSTM_96.63.pth')[0], map_location=device)
     model.load_state_dict(a)
     model.to(device)
     frequency = [0] * num_classes       # MPEG-2, H.263, H.264,... 의 예측값의 빈도수를 각각 저장
@@ -142,7 +111,7 @@ def codec_decide(video):
         tt = video.read(all_bytes_in_a_sentence * int(math.log2(16))).hex
         video.pos -= all_bytes_in_a_sentence * int(math.log2(16))
         video.pos += shift_bytes_in_a_sentence * int(math.log2(16))
-        predict = test(tt, test_scenario, num_chars_in_a_word, model)
+        predict = test(tt, num_chars_in_a_word, model)
         frequency[predict] += 1
     return frequency
 
@@ -239,28 +208,6 @@ def scenario_search(video, header_list,start=False):
                         # if video[ii:].startswith(bin_header_list[k][kk]): frequency_header[k] += 1                                  # startswith 왜이렇게 느린가... 100배 차이남
     return frequency_header
 
-
-
-def factor(n):
-    result = []
-    original = n
-    for i in primeSieve(n):
-        count = 0
-        while n % i == 0:
-            count += 1
-            n = int(n/i)
-        if count != 0:
-            result.append((i, count))   # (소수, 개수) 형태로 리스트에 추가됨
-        if n == 1:
-            break
-    # print(result)
-    count = 1
-    ref = 2
-    for b in range(ref):
-        count *= int(pow(result[b][0], result[b][1]))
-    if count == original:
-        count /= int(pow(result[1][0], result[1][1]))
-    return int(count)
 
 
 def endian_swap_all(string, byte):
@@ -564,99 +511,6 @@ def split1to10(string, word_length):        # 1-byte N words
     return string
 
 
-def preProcessing(num_words_per_sentence, shift, num_chars, dataset, training_scenario, mode):
-    global codec_list
-    codec = []
-    label = []
-    you = 'test_set'
-    w = [1, 1, 1, 1]
-    if mode == you:
-        codec_list2 = []
-        label_test = randint(0, len(codec_list) - 1)
-        codec_list2.append(codec_list[label_test])
-    else:
-        codec_list2 = codec_list
-    for i in range(len(codec_list2)):
-        # print(i)
-        files = glob('D:/' + mode + '/*' + codec_list2[i])
-        # print(files)
-        if mode == you:
-            files2 = []
-            file_test = randint(0, len(files) - 1)
-            files2.append(files[file_test])
-        else:
-            files2 = files
-        for j in range(len(files2)):
-            b = bitstring.ConstBitArray(filename=files2[j]).hex
-            original = b
-            print(files2[j])
-            if (mode == you and training_scenario in [0]) or \
-                    (mode != you and training_scenario in [0, 1, 2, 3]):
-                for number in range(int(w[0] * dataset)):
-                    number *= num_chars
-                    end = number + int(num_words_per_sentence * num_chars)
-                    en = b[number:end]
-                    codec.append(en)
-                    if mode == you:
-                        label.append(label_test)
-                    else:
-                        label.append(i)
-            if (mode == you and training_scenario in [1]) or \
-                    (mode != you and training_scenario in [1, 3]):
-                if mode == you:
-                    b = Hex2Zero(b)
-                for number in range(int(w[1] * dataset)):
-                    number *= num_chars
-                    end = number + int(num_words_per_sentence * num_chars)
-                    en = b[number:end]
-                    if mode == you:
-                        codec.append(en)
-                        label.append(label_test)
-                    else:
-                        codec.append(Hex2Zero(en))
-                        label.append(i)
-            if (mode == you and training_scenario in [2]) or \
-                    (mode != you and training_scenario in [2, 3]):
-                if mode == you:
-                    b = xor_fast(b)
-                for number in range(int(w[2] * dataset)):
-                    number *= num_chars
-                    end = number + int(num_words_per_sentence * num_chars)
-                    en = b[number:end]
-                    if mode == you:
-                        codec.append(en)
-                        label.append(label_test)
-                    else:
-                        codec.append(xor_fast(en))
-                        label.append(i)
-            # """
-            if (mode == you and training_scenario in [4]) or \
-                    (mode != you and training_scenario in [4, 3]):
-                if mode == you:
-                    b = endian_swap_all(b, 4)
-                for number in range(int(w[3] * dataset)):
-                    number *= num_chars
-                    end = number + int(num_words_per_sentence * num_chars)
-                    en = b[number:end]
-                    if mode == you:
-                        codec.append(en)
-                        label.append(label_test)
-                    else:
-                        codec.append(endian_swap(en))
-                        label.append(i)
-            # """
-    if mode == 'training_set':
-        result = shufflemylist(codec, label)
-    else:
-        result = []
-        result.append(codec)
-        result.append(label)
-    if mode == you:
-        result.append(original)
-        result.append(b)
-    return result
-
-
 def shufflemylist(random_codec, random_label):
     order = list(range(len(random_codec)))
     shuffle(order)
@@ -671,7 +525,7 @@ def shufflemylist(random_codec, random_label):
     return result
 
 
-def test(test_text, scenario, num_chars_in_a_word, model):
+def test(test_text, num_chars_in_a_word, model):
     # Test
     test_text = test_text.replace(" ", "")
     test_text = split1to10(test_text, num_chars_in_a_word)
@@ -682,32 +536,6 @@ def test(test_text, scenario, num_chars_in_a_word, model):
     predict, _ = model(test_batch)
     predict = predict.data.max(1, keepdim=True)[1]
     return predict[0][0]
-
-
-def testall(test_sentences, test_labels, scenario, num_chars_in_a_word, model):
-    global num_classes
-    confusion_matrix = np.zeros((num_classes, num_classes))
-    for i in range(len(test_sentences)):
-        predict = test(test_sentences[i], scenario, num_chars_in_a_word, model)
-        for j in range(num_classes):
-            for k in range(num_classes):
-                if predict == j and test_labels[i] == k:
-                    confusion_matrix[j][k] += 1
-    return confusion_matrix
-
-
-def show_matrix(c):
-    print(c)
-    fig = plt.figure()
-    # [predict][true]
-    ax = fig.add_subplot(1, 1, 1)
-    cax = ax.matshow(c, cmap='BuPu')
-    fig.colorbar(cax)
-    cm_label = ['2', '3', '8', 'J', 'B', 'T']
-    ax.set_xticklabels(['']+cm_label, fontdict={'fontsize': 14})
-    ax.set_yticklabels(['']+cm_label, fontdict={'fontsize': 14})
-    plt.show()
-    return
 
 
 #def scenario_detect(frequency, video, count):           # 함수 -> 판단전용 프로세스로 ..
@@ -721,7 +549,7 @@ if __name__ == "__main__":  # def sangmin_deep_predict(mode, src):
         for i, aa in enumerate(codec):
             if aa == sys.argv[2]: frequency[i] = 1
 
-        print('변형 시나리오 inv, xor 판단 중..')                # INV, XOR 두가지만
+        print('변형 시나리오 inv, x_or 판단 중..')                # INV, XOR 두가지만
 
         if frequency.index(max(frequency)) == 0:                                                # MPEG2
             ssc = [hex2bin('000001b3')]                                                         # 스타트 코드들 저장
@@ -756,7 +584,7 @@ if __name__ == "__main__":  # def sangmin_deep_predict(mode, src):
             start = False
 
         elif frequency.index(max(frequency)) == 3:                                              # H.265
-            ssc = [hex2bin('00000001')]                                                           # sps
+            ssc = [hex2bin('00000001')]                                                         # sps
             sec = [hex2bin('000003')]                                                           # pps
             gop = []                                                                            # idr
             psc = []                                                                            # nidr
