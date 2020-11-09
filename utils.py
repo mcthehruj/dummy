@@ -506,7 +506,7 @@ if __name__ == "__main__":
             start = True
 
         all = list2int(ssc) + list2int(sec) + list2int(gop) + list2int(psc)
-        num_reversed_header = scenario_search(video, xor_header([ssc, sec, gop, psc], xor_flag=0), start_=start)
+        num_inv_header = scenario_search(video, xor_header([ssc, sec, gop, psc], xor_flag=0), start_=start)
         num_xor_header = scenario_search(video, xor_header([ssc, sec, gop, psc], xor_flag=1), start_=start)
 
         video.pos = 0

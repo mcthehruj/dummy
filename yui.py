@@ -8,8 +8,11 @@ import subprocess
 
 import PIL.Image
 import PIL.ImageTk
+import cv2
 from utils import *
+import tiff_scenario, png_scenario, bmp_scenario
 from brisque import *
+
 
 def isHangul(text):
     encText = text
@@ -181,12 +184,19 @@ class LoadDisplay(object):  # ui 영상창 클래스
             if self.frame is None:  # 파일은 존재하지만 디코딩이 실패 -> IVC 디코더로 시도
                 self.vid.release()
                 print("IVC 디코더로 시도")
-                subprocess.run("ldecod_ivc.exe %s tmp_file_%s" % (self.video_source, os.path.basename(self.video_source)), stdout=subprocess.DEVNULL)  # 현재폴더에 재인코딩된 임시파일 생성
-                yuv_src = 'tmp_file_' + os.path.basename(self.video_source)
-                subprocess.run("ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i %s -c:v hevc -y %s.hevc" % (yuv_src, os.path.splitext(yuv_src)[0]), stdout=subprocess.DEVNULL)
-                # if os.path.isfile(os.path.splitext(yuv_src)[0] + '.hevc'): 파일이존재하지않을이유는없을걸
-                if os.path.getsize(os.path.splitext(yuv_src)[0] + '.hevc') > 1:
-                    self.vid = cv2.VideoCapture(os.path.splitext(yuv_src)[0] + '.hevc')
+                subprocess.run("ldecod_ivc.exe %s tmp_file_%s" % (self.video_source, os.path.splitext(os.path.basename(self.video_source))[0]+'.bit'), stdout=subprocess.DEVNULL)  # 현재폴더에 재인코딩된 임시파일 생성(yuv)
+                list_of_yuv_files = glob('tmp_file_%s*' % os.path.splitext(os.path.basename(self.video_source))[0])     # 이름_resㅇㅇㅇxㅇㅇㅇ.bit
+                if len(list_of_yuv_files) != 0:
+                    latest_file = max(list_of_yuv_files, key=os.path.getctime)                                          # 가장최근에 생성된
+                    t = latest_file.find('_res')                                                                        # _res 인식
+                    width = int((latest_file[t+4:]).split('x')[0])
+                    height = int((latest_file[t+4:]).split('x')[1].split('.')[0])
+                    yuv_src = 'tmp_file_' + os.path.splitext(os.path.basename(self.video_source))[0] + '_res%dx%d' %(width,height) + '.bit'
+                    yuv_srcn = 'tmp_file_' + os.path.splitext(os.path.basename(self.video_source))[0]
+                    subprocess.run("ffmpeg.exe -f rawvideo -s %dx%d -pix_fmt yuv420p -i %s -c:v hevc -y %s.hevc" % (width, height, yuv_src, yuv_srcn), stdout=subprocess.DEVNULL)
+                    # if os.path.isfile(os.path.splitext(yuv_src)[0] + '.hevc'): 파일이존재하지않을이유는없을걸
+                if 'yuv_src' in vars():
+                    if os.path.getsize(yuv_srcn + '.hevc') > 1:      self.vid = cv2.VideoCapture(yuv_srcn + '.hevc')    # 존재, 용량있음, 띄우기
                 else:       # IVC 디코더로 디코딩 불가시 시퀀스는 에러(변조)영상 화면상에 에러 메세지 띄우기
                     self.vid = cv2.VideoCapture('errd1.png')
                     print('오류디스플레이 출력')
@@ -369,6 +379,9 @@ def non_block_threading_popen(text, src, encoding='utf-8'):  # stdout를 read로
 
     LoadDisplay.pausedisplay = 1
     canvas_loading.show()
+
+    if os.device_encoding(0) is not None:      encoding = os.device_encoding(0)     ####### 터미널 실행시에 인코딩안맞는경우!!!!!!!!  #print(os.device_encoding(0))
+
     p = subprocess.Popen(src, encoding=encoding, stdout=subprocess.PIPE)
     q = Queue()
     t = threading.Thread(target=enqueue_output, args=(p.stdout, q))
