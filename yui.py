@@ -1,5 +1,3 @@
-import os, glob
-import winsound
 import operator
 import threading
 import tkinter.messagebox
@@ -10,9 +8,7 @@ import subprocess
 
 import PIL.Image
 import PIL.ImageTk
-import cv2
 from utils import *
-import tiff_scenario, png_scenario, bmp_scenario
 from brisque import *
 
 def isHangul(text):

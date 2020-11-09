@@ -1,5 +1,5 @@
 import sys
-from random import shuffle, randint
+from random import shuffle
 from glob import glob
 import bitstring
 import numpy as np
@@ -7,7 +7,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-import matplotlib.pyplot as plt
 import math
 from datetime import datetime
 import timeit
@@ -29,7 +28,7 @@ num_classes = len(codec_list)
 all_bytes_in_a_sentence = 64
 shift_bytes_in_a_sentence = 1
 num_chars_in_a_word = 1
-dataset = 16
+number_of_sentences = 16
 
 # Word List for Att-BLSTM
 word_dict = {}
@@ -49,7 +48,8 @@ for i in range(16):
 
 vocab_size = len(word_dict)
 
-# Network
+
+# Network architecture
 class BiLSTM_Attention(nn.Module):
     def __init__(self, n_hidden):
         super(BiLSTM_Attention, self).__init__()
@@ -60,60 +60,42 @@ class BiLSTM_Attention(nn.Module):
         self.out = nn.Linear(n_hidden * 2, num_classes).to(device)
         self.n_hidden = n_hidden
 
-        # lstm_output : [batch_size, n_step, n_hidden * num_directions(=2)], F matrix
-
     def attention_net(self, lstm_output, final_state):
         hidden = final_state.view(-1, self.n_hidden * 2, 1)
-        # hidden : [batch_size, n_hidden * num_directions(=2), 1(=n_layer)]
-        # print(hidden[ind])
         attn_weights = torch.bmm(lstm_output, hidden).squeeze(2)
-        # attn_weights : [batch_size, n_step]
-        # print(attn_weights[ind])
         soft_attn_weights = F.softmax(attn_weights, 1)
-        # print(soft_attn_weights[ind])
-        # [batch_size, n_hidden * num_directions(=2), n_step] * [batch_size, n_step, 1]
-        # = [batch_size, n_hidden * num_directions(=2), 1]
         context = torch.bmm(lstm_output.transpose(1, 2), soft_attn_weights.unsqueeze(2)).squeeze(2)
-        # print(context[ind])
-        return context, soft_attn_weights.data # context : [batch_size, n_hidden * num_directions(=2)]
+        return context, soft_attn_weights.data
 
     def forward(self, X):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        input = self.embedding(X).to(device) # input : [batch_size, len_seq, embedding_dim]
-        # print(input[ind])
+        input = self.embedding(X).to(device)
         input = input.permute(1, 0, 2)
-        # input : [len_seq, batch_size, embedding_dim]
         hidden_state = Variable(torch.zeros(1*2, len(X), self.n_hidden)).to(device)
-        # [num_layers(=1) * num_directions(=2), batch_size, n_hidden]
         cell_state = Variable(torch.zeros(1*2, len(X), self.n_hidden)).to(device)
-        # [num_layers(=1) * num_directions(=2), batch_size, n_hidden]
-
-        # final_hidden_state, final_cell_state : [num_layers(=1) * num_directions(=2), batch_size, n_hidden]
         output, (final_hidden_state, final_cell_state) = self.lstm(input, (hidden_state, cell_state))
-        output = output.permute(1, 0, 2) # output : [batch_size, len_seq, n_hidden]
-        # print(output[ind])
+        output = output.permute(1, 0, 2)
         attn_output, attention = self.attention_net(output, final_hidden_state)
-        return self.out(attn_output), attention # model : [batch_size, num_classes], attention : [batch_size, n_step]
+        return self.out(attn_output), attention
 
 
-
-def codec_decide(video):
-    video.pos = 0
+def codec_decide(video_):
+    video_.pos = 0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = BiLSTM_Attention(n_hidden)
     model.to(device)
     a = torch.load(glob('Bi-LSTM_96.63.pth')[0], map_location=device)
     model.load_state_dict(a)
     model.to(device)
-    frequency = [0] * num_classes       # MPEG-2, H.263, H.264,... 의 예측값의 빈도수를 각각 저장
-    limit = (dataset - 1) * shift_bytes_in_a_sentence + all_bytes_in_a_sentence     # 학습시킨 데이터 길이만큼만 검증
+    predicted_codec = [0] * num_classes       # MPEG-2, H.263, H.264,... 의 예측값의 빈도수를 각각 저장
+    limit = (number_of_sentences - 1) * shift_bytes_in_a_sentence + all_bytes_in_a_sentence     # 학습시킨 데이터 길이만큼만 검증
     for i in range(limit):
-        tt = video.read(all_bytes_in_a_sentence * int(math.log2(16))).hex
-        video.pos -= all_bytes_in_a_sentence * int(math.log2(16))
-        video.pos += shift_bytes_in_a_sentence * int(math.log2(16))
+        tt = video_.read(all_bytes_in_a_sentence * int(math.log2(16))).hex
+        video_.pos -= all_bytes_in_a_sentence * int(math.log2(16))
+        video_.pos += shift_bytes_in_a_sentence * int(math.log2(16))
         predict = test(tt, num_chars_in_a_word, model)
-        frequency[predict] += 1
-    return frequency
+        predicted_codec[predict] += 1
+    return predicted_codec
 
 
 def xor_header(header_list, xor_flag=1):                                # 원래 코덱의 스타트 코드 검색 리스트
@@ -129,7 +111,7 @@ def xor_header(header_list, xor_flag=1):                                # 원래
             elif xor_flag == 1:
                 header_list_[i].append(xor_fast(header_list[i][j]))
                 # 스타트 코드 다음 한 비트가 0이냐 1이냐에 따라서 두 가지 결과가 나오기에 모두 저장
-                if   header_list_[i][j*2][len(header_list_[i][j*2]) - 1] == '0':
+                if header_list_[i][j*2][len(header_list_[i][j*2]) - 1] == '0':
                     new = header_list_[i][j*2][:len(header_list_[i][j*2]) - 1]
                     new += '1'
                     header_list_[i].append(new)
@@ -139,92 +121,41 @@ def xor_header(header_list, xor_flag=1):                                # 원래
                     header_list_[i].append(new)
     return header_list_
 
-"""
-def scenario_search(video, header_list):
-    frequency_header = [0] * len(header_list)
-    time_scale = int(math.pow(10, 2)) // 2              # 1일때 모든 비트스트림을 다 본다. 시간이 너무 길게 걸리므로 이 값을 늘리면서 실험하는 것을 추천.
-    limit = (len(video) - len(header_list[0][0])) // time_scale
-    for video.pos in range(limit):
-        for k in range(len(header_list)):
-            if header_list[k] == []:
-                continue
-            code = video.read(len(header_list[k][0])).bin
-            if code in header_list[k]:
-                frequency_header[k] += 1
-    return frequency_header
-"""
-# def scenario_search(video, header_list):
-#     frequency_header = [0] * len(header_list)
-#     time_scale = 30  # 1일때 모든 비트스트림을 다 본다. 시간이 너무 길게 걸리므로 이 값을 늘리면서 실험하는 것을 추천.
-#
-#     video = video.bin       # binstring read로 읽어오게되면 bit 개수만큼 파일리드를 그제서야 돌려서 엄청오래걸리는듯,, bin str으로 처리하는게 빠름
-#
-#     limit = len(video) // time_scale
-#     if limit < 5000:   limit = 5000           # 하한
-#     if limit > 60000: limit = 60000           # 상한   120000 정도가 적당한거 같은데 느리니까 60000
-#     bin_header_list = header_list
-#     #for aa in header_list:                                                      # nalu에 여러개를 등록한 경우 ssc sec ...4개(aa)를 돌며 ..
-#     #    bin_header_list.append( [bitstring.BitStream(bin=bb) for bb in aa] )    # bb개
-#
-#     for ii in range(0, limit, 8):
-#         #video.pos = ii                                              # 비트위치 ii
-#         for k in range(len(bin_header_list)):                       # 헤더리스트 4개에 대한 포문
-#             if bin_header_list[k] == []: continue
-#             for kk in range(len(bin_header_list[k])):               # nalu 쌍들 여러개에 대한 포문
-#                 if video[ii:ii+len(bin_header_list[k][kk])] == bin_header_list[k][kk]: frequency_header[k] += 1
-#                 #if video[ii:].startswith(bin_header_list[k][kk]): frequency_header[k] += 1                                  # startswith 왜이렇게 느린가... 100배 차이남
-#     return frequency_header
 
-def scenario_search(video, header_list,start=False):
-    frequency_header = [0] * len(header_list)
+def scenario_search(video_, header_list, start_=False):
+    predicted_codec_header = [0] * len(header_list)
     time_scale = 30  # 1일때 모든 비트스트림을 다 본다. 시간이 너무 길게 걸리므로 이 값을 늘리면서 실험하는 것을 추천.
 
-    video = video.bin       # binstring read로 읽어오게되면 bit 개수만큼 파일리드를 그제서야 돌려서 엄청오래걸리는듯,, bin str으로 처리하는게 빠름
+    video_ = video_.bin       # binstring read로 읽어오게되면 bit 개수만큼 파일리드를 그제서야 돌려서 엄청오래걸리는듯,, bin str으로 처리하는게 빠름
 
-    limit = len(video) // time_scale
+    limit = len(video_) // time_scale
     if limit < 5000:   limit = 5000           # 하한
     if limit > 60000: limit = 60000           # 상한   120000 정도가 적당한거 같은데 느리니까 60000
     bin_header_list = header_list
 
-    if start == True:
+    if start_:
         for kk in range(len(bin_header_list[0])):
-            if video[0:len(header_list[0][0])] == header_list[0][kk]:
-                frequency_header[0] += 1
-        for ii in range(0, limit, 8):                #video.pos = ii                                              # 비트위치 ii
-            for k in range(len(bin_header_list)):                       # 헤더리스트 4개에 대한 포문
+            if video_[0:len(header_list[0][0])] == header_list[0][kk]:
+                predicted_codec_header[0] += 1
+        for ii in range(0, limit, 8):                   # video.pos = ii : 비트위치 ii
+            for k in range(len(bin_header_list)):       # header list에 대한 for
                 if k == 0:
                     continue
-                if bin_header_list[k] == []: continue
-                for kk in range(len(bin_header_list[k])):               # nalu 쌍들 여러개에 대한 포문
-                    if video[ii:ii+len(bin_header_list[k][kk])] == bin_header_list[k][kk]: frequency_header[k] += 1
-                        # if video[ii:].startswith(bin_header_list[k][kk]): frequency_header[k] += 1                                  # startswith 왜이렇게 느린가... 100배 차이남
+                if bin_header_list[k] == []:
+                    continue
+                for kk in range(len(bin_header_list[k])):               # nalu 쌍들 여러개에 대한 for
+                    if video_[ii:ii + len(bin_header_list[k][kk])] == bin_header_list[k][kk]:
+                        predicted_codec_header[k] += 1
+
     else:
-        for ii in range(0, limit, 8):
-                #video.pos = ii                                              # 비트위치 ii
-            for k in range(len(bin_header_list)):                       # 헤더리스트 4개에 대한 포문
-                if bin_header_list[k] == []: continue
-                for kk in range(len(bin_header_list[k])):               # nalu 쌍들 여러개에 대한 포문
-                    if video[ii:ii+len(bin_header_list[k][kk])] == bin_header_list[k][kk]: frequency_header[k] += 1
-                        # if video[ii:].startswith(bin_header_list[k][kk]): frequency_header[k] += 1                                  # startswith 왜이렇게 느린가... 100배 차이남
-    return frequency_header
-
-
-
-def endian_swap_all(string, byte):
-    result = ''
-    for i in range(len(string)//byte):
-        partition = string[i*byte:i*byte+byte]
-        result += endian_swap(partition)
-    return result
-
-
-def endian_swap(string):
-    string = string[::-1]
-    result = ''
-    for i in range(len(string)//2):
-        partition = string[i*2:i*2+2]
-        result += partition[::-1]
-    return result
+        for ii in range(0, limit, 8):               # video.pos = ii : 비트위치 ii
+            for k in range(len(bin_header_list)):   # header list에 대한 for
+                if bin_header_list[k] == []:
+                    continue
+                for kk in range(len(bin_header_list[k])):               # nalu 쌍들 여러개에 대한 for
+                    if video_[ii:ii + len(bin_header_list[k][kk])] == bin_header_list[k][kk]:
+                        predicted_codec_header[k] += 1
+    return predicted_codec_header
 
 
 def encode_all(string, operator, part):
@@ -310,30 +241,8 @@ def dxor_fast(string, part=1):
 # 2메가 영상 xor 복조하는데 5분이 걸려서 비트스트림버전으로 변경
 
 def xor_fast_bitstream(stream, none=0, flag=0):
-    """if type(stream) is str: stream = bitstring.BitStream(bin=stream); flag=1      #상민 xor과의 호환성을위해  bin스트링도 입력받고 binarystream도 가능
-    result = bytes()
-    part = len(stream)
-    for ii in range(0, part-32, 32):            # 32배수로 돈다
-        a = stream.peek('uint:32')
-        stream.pos += 1
-        b = stream.peek('uint:32')
-        stream.pos += 31
-        c = (a^b).to_bytes(4, byteorder='big')
-        result += c
-    remain = part - stream.pos                  # 32미만으로 남았을때
-    remain_b = remain // 8                      #
-    remain_b += bool(remain % 8)                # 올림처리 위해
-    a = stream.peek(f'uint:{remain}')
-    if remain == 1: b = 0                       # 1bit 남은 경우 읽을 bit이 0이라 오류나네
-    else:
-        stream.pos += 1
-        b = stream.peek(f'uint:{remain-1}') << 1    # 마지막 1개는 0 채운다
-    c = ((a^b)<<(-remain)%8).to_bytes(remain_b, byteorder='big')
-    result += c
-    return bitstring.BitStream(result).bin if flag == 1 else result"""
-
-    if type(stream) is str: stream = bitstring.BitStream(bin=stream); flag=1      #상민 xor과의 호환성을위해  bin스트링도 입력받고 binarystream도 가능
-    result = bytearray() ; i = 0
+    if type(stream) is str: stream = bitstring.BitStream(bin=stream); flag=1    #bitstring, binarystream 둘다 입력 가능
+    result = bytearray(); i = 0
     part = len(stream)
     stream1 = stream.bin
     stream2 = stream.bin[1:]
@@ -343,10 +252,10 @@ def xor_fast_bitstream(stream, none=0, flag=0):
         c = (a^b).to_bytes(4, byteorder='big')
         result += c; i = ii+32
     remain = part - i                          # 32미만으로 남았을때
-    remain_b = remain // 8                      #
+    remain_b = remain // 8
     remain_b += bool(remain % 8)                # 올림처리 위해
     a = int(stream1[i:i+remain], base=2)
-    if remain == 1: b = 0                       # 1bit 남은 경우 읽을 bit이 0이라 오류나네
+    if remain == 1: b = 0                       # 1bit 남은 경우 읽을 bit이 0이라 오류
     else:
         b = int(stream2[i:i+remain-1], base=2) << 1    # 마지막 1개는 0 채운다
     c = ((a^b)<<(-remain)%8).to_bytes(remain_b, byteorder='big')
@@ -354,44 +263,6 @@ def xor_fast_bitstream(stream, none=0, flag=0):
     return bitstring.BitStream(result).bin if flag == 1 else result
 
 def dxor_fast_bitstream(stream, none=0, flag=0):
-
-    #if type(stream) is str: stream = bitstring.BitStream(bin=stream); flag=1      #상민 xor과의 호환성을위해
-    """stream = stream.bin
-    result = bytearray()
-    part = len(stream)
-
-    before_1bit = 0
-    for ii in range(0, part-32, 32):            #   1 빗씩
-        tem_uint = 0
-        for jj in range(31, -1, -1):
-            a = stream.read('uint:1')
-            b = before_1bit
-            before_1bit = (a^b)
-            tem_uint |= before_1bit << jj
-            ####tem_uint.append(before_1bit)
-        c = tem_uint.to_bytes(8, byteorder='big')
-        result += c
-    remain = part - stream.pos                  # 32미만으로 남았을때
-    remain_b = remain // 8                      #
-    remain_b += bool(remain % 8)                # 올림처리 위해
-    tem_uint = 0
-    for jj in range(remain-1, -1, -1):
-        a = stream.read('uint:1')
-        b = before_1bit
-        before_1bit = (a^b)
-        tem_uint |= before_1bit << jj
-    c = (tem_uint<<(-remain)%8).to_bytes(remain_b, byteorder='big')
-    result += c                                 # 처음 0bit을 안쓴채로 일단완성
-    sh1 = bitstring.BitStream(bin='0')
-    sh1.append(result)
-    result = sh1.peek(len(sh1)-1)
-    if before_1bit == 1:
-        result = (~result).tobytes()           # 마지막 1비트를 통해 뒤집을지말지 판단하고 마지막비트삭제해서 result로 담아
-    else:
-        result = (result).tobytes()
-    return bitstring.BitStream(result).bin if flag == 1 else result
-
-    """
     result = []
     result.append(0)
     lastc = 0
@@ -407,8 +278,6 @@ def dxor_fast_bitstream(stream, none=0, flag=0):
 
     return bitstring.BitStream(result).bin if flag == 1 else result.bytes
 
-
-### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
 def dec2bin(number, length):
     result = ''
@@ -538,31 +407,28 @@ def test(test_text, num_chars_in_a_word, model):
     return predict[0][0]
 
 
-#def scenario_detect(frequency, video, count):           # 함수 -> 판단전용 프로세스로 ..
-if __name__ == "__main__":  # def sangmin_deep_predict(mode, src):
+if __name__ == "__main__":
     if (len(sys.argv) != 3):
         print('입력 인자 오류')
     if (len(sys.argv) == 3):
         src = sys.argv[1]
         video = bitstring.ConstBitStream(filename=src)
-        frequency = [0,0,0,0,0,0,0,0,0,0,0]              # MPEG2 H.263 H.264 H.265 IVC VP8 JPEG JPEG2000 BMP PNG TIFF                      ## sys.argv[2].split('.')
+        predicted_codec_ = [0,0,0,0,0,0,0,0,0,0,0]              # MPEG2 H.263 H.264 H.265 IVC VP8 JPEG JPEG2000 BMP PNG TIFF
+        # sys.argv[2].split('.')
         for i, aa in enumerate(codec):
-            if aa == sys.argv[2]: frequency[i] = 1
+            if aa == sys.argv[2]: predicted_codec_[i] = 1
 
         print('변형 시나리오 inv, x_or 판단 중..')                # INV, XOR 두가지만
 
-        if frequency.index(max(frequency)) == 0:                                                # MPEG2
+        if predicted_codec_.index(max(predicted_codec_)) == 0:                                                # MPEG2
             ssc = [hex2bin('000001b3')]                                                         # 스타트 코드들 저장
             sec = [hex2bin('000001b5')]
             gop = [hex2bin('000001b8')]
             psc = [hex2bin('00000100')]
             start = False
 
-        elif frequency.index(max(frequency)) == 1:                                              # H.263
+        elif predicted_codec_.index(max(predicted_codec_)) == 1:                                              # H.263
             ssc = [hex2bin('000080'), hex2bin('000081'), hex2bin('000082'), hex2bin('000083')]  # psc
-            # sec = [hex2bin('0000fc'), hex2bin('0000fd'), hex2bin('0000fe'), hex2bin('0000ff')]# eos
-            # gop = [hex2bin('0000f8'), hex2bin('0000f9')]                                      # eosbs
-            # sec = []
             sec = []                                                                            # gbsc
             # """
             for i in range(8, 16):
@@ -576,63 +442,63 @@ if __name__ == "__main__":  # def sangmin_deep_predict(mode, src):
             psc = []
             start = True
 
-        elif frequency.index(max(frequency)) == 2:                                              # H.264
+        elif predicted_codec_.index(max(predicted_codec_)) == 2:                                              # H.264
             ssc = [hex2bin('0000000167')]                                                       # sps
             sec = [hex2bin('0000000168')]                                                       # pps
             gop = [hex2bin('0000000165'), hex2bin('0000010605')]                                # idr
             psc = [hex2bin('0000000141')]                                                       # nidr
             start = False
 
-        elif frequency.index(max(frequency)) == 3:                                              # H.265
+        elif predicted_codec_.index(max(predicted_codec_)) == 3:                                              # H.265
             ssc = [hex2bin('00000001')]                                                         # sps
             sec = [hex2bin('000003')]                                                           # pps
             gop = []                                                                            # idr
             psc = []                                                                            # nidr
             start = False
 
-        elif frequency.index(max(frequency)) == 4:                                              # IVC
+        elif predicted_codec_.index(max(predicted_codec_)) == 4:                                              # IVC
             ssc = [hex2bin('000001b0')]                                                         # vsc
             sec = [hex2bin('00000100')]                                                         # vec
             gop = [hex2bin('000001b2')]                                                         # usc
             psc = [hex2bin('000001b3')]                                                         # udc
             start = True
 
-        elif frequency.index(max(frequency)) == 5:                                              # VP8
+        elif predicted_codec_.index(max(predicted_codec_)) == 5:                                              # VP8
             ssc = [hex2bin('1a45dfa3010000000000001f')]                                         # sc
             sec = [hex2bin('7765626d')]                                                         # webm
             gop = [hex2bin('1549a96601')]                                                       # ed1
             psc = [hex2bin('00000000000032')]                                                   # ed2
             start = True
 
-        elif frequency.index(max(frequency)) == 6:                                              # JPEG
+        elif predicted_codec_.index(max(predicted_codec_)) == 6:                                              # JPEG
             ssc = [hex2bin('ffd8')]                                                             # sc
             sec = [hex2bin('ffc0'), hex2bin('ffc2')]                                            # sof
             gop = []                                                                            # None
             psc = []                                                                            # None
             start = True
 
-        elif frequency.index(max(frequency)) == 7:                                              # JPEG2000
+        elif predicted_codec_.index(max(predicted_codec_)) == 7:                                              # JPEG2000
             ssc = [hex2bin('ff4f')]                                                             # sc
             sec = [hex2bin('ff90')]                                                             # sot
             gop = [hex2bin('ff93')]                                                             # sod
             psc = []                                                                            # siz
             start = True
 
-        elif frequency.index(max(frequency)) == 8:                                              # BMP
+        elif predicted_codec_.index(max(predicted_codec_)) == 8:                                              # BMP
             ssc = [hex2bin('424d')]                                                             # hd1
             sec = [hex2bin('28000000'), hex2bin('0c000000'), hex2bin('40000000'), hex2bin('6c000000'), hex2bin('7c000000')]
             gop = []                                                                            # V3
             psc = []                                                                            # None
             start = True
 
-        elif frequency.index(max(frequency)) == 9:                                              # PNG
+        elif predicted_codec_.index(max(predicted_codec_)) == 9:                                              # PNG
             ssc = [hex2bin('89504e47')]                                                         # hd1
             sec = [hex2bin('49484452')]                                                         # ihdr
             gop = [hex2bin('49444154')]                                                         # idat
             psc = []                                                                            # None
             start = True
 
-        elif frequency.index(max(frequency)) == 10:                                             # TIFF
+        elif predicted_codec_.index(max(predicted_codec_)) == 10:                                             # TIFF
             ssc = [hex2bin('4949'), hex2bin('4d4d')]                                            # hd1
             sec = [hex2bin('002a'), hex2bin('2a00')]                                            # hd2
             gop = []                                                                            # None
@@ -640,51 +506,52 @@ if __name__ == "__main__":  # def sangmin_deep_predict(mode, src):
             start = True
 
         all = list2int(ssc) + list2int(sec) + list2int(gop) + list2int(psc)
-        hr = scenario_search(video, xor_header([ssc, sec, gop, psc], xor_flag=0), start=start)
-        hx = scenario_search(video, xor_header([ssc, sec, gop, psc], xor_flag=1), start=start)
+        num_reversed_header = scenario_search(video, xor_header([ssc, sec, gop, psc], xor_flag=0), start_=start)
+        num_xor_header = scenario_search(video, xor_header([ssc, sec, gop, psc], xor_flag=1), start_=start)
 
         video.pos = 0
         video = video.read(video.length).bin
-        hh = [hr, hx]                                                               # 더미 헤더 카운트 추가
-        condition = [True, True]                                                    # 더미 헤더 카운트 추가
+        header_count = [num_inv_header, num_xor_header]
+        inv_vs_xor = [True, True]
 
-        for h in range(len(hh)):                   # h =[hr, hx]
-            if sum(hh[h]) == 0 or hh[h][0] == 0:                                 # 모두 0 이어야 제외하도록 바꿔봄
-                condition[h] = False
+        for h in range(len(header_count)):                   # h =[num_inv_header, num_xor_header]
+            if sum(header_count[h]) == 0 or header_count[h][0] == 0:                                 # 모두 0 이어야 제외하도록 바꿔봄
+                inv_vs_xor[h] = False
 
-            if codec[frequency.index(max(frequency))] == 'BITMAP':
-                if hh[h][0] != 1:       # 헤더의 수가 너무 많으면 믿지 않는다
-                    print('too many header > 1', f'(inv{hh[0]} vs x_or{hh[1]})')
-                    condition[h] = False
+            if codec[predicted_codec_.index(max(predicted_codec_))] == 'BITMAP':
+                if header_count[h][0] != 1:       # 헤더의 수가 너무 많으면 믿지 않는다
+                    print('too many header > 1', f'(inv{header_count[0]} vs x_or{header_count[1]})')
+                    inv_vs_xor[h] = False
 
-            if codec[frequency.index(max(frequency))] == 'H.263':
-                if hh[h][1] >= 10:      # 헤더의 수가 너무 많으면 믿지 않는다
-                    print('so many break >= 10', f'(inv{hh[0]} vs x_or{hh[1]})')
-                    condition[h] = False
+            if codec[predicted_codec_.index(max(predicted_codec_))] == 'H.263':
+                if header_count[h][1] >= 10:      # 헤더의 수가 너무 많으면 믿지 않는다
+                    print('so many break >= 10', f'(inv{header_count[0]} vs x_or{header_count[1]})')
+                    inv_vs_xor[h] = False
 
-            if codec[frequency.index(max(frequency))] == 'TIFF' or codec[frequency.index(max(frequency))] == 'JPEG' or codec[frequency.index(max(frequency))] == 'PNG':        #'JPEG2000', 'PNG', 'TIFF'
+            if codec[predicted_codec_.index(max(predicted_codec_))] == 'TIFF' or codec[predicted_codec_.index(max(predicted_codec_))] == 'JPEG' or codec[predicted_codec_.index(max(predicted_codec_))] == 'PNG':        #'JPEG2000', 'PNG', 'TIFF'
                 if h == 0:
-                    if hh[h][0] != 1:       # 헤더의 수가 너무 많으면 믿지 않는다
-                        print('too many header > 1', f'(inv{hh[0]} vs x_or{hh[1]})')
-                        condition[h] = False
+                    if header_count[h][0] != 1:       # 헤더의 수가 너무 많으면 믿지 않는다
+                        print('too many header > 1', f'(inv{header_count[0]} vs x_or{header_count[1]})')
+                        inv_vs_xor[h] = False
                 else:
-                    if hh[h][0] > 2:        # 헤더의 수가 너무 많으면 믿지 않는다
-                        print('too many header > 1', f'(inv{hh[0]} vs x_or{hh[1]})')
-                        condition[h] = False
+                    if header_count[h][0] > 2:        # 헤더의 수가 너무 많으면 믿지 않는다
+                        print('too many header > 1', f'(inv{header_count[0]} vs x_or{header_count[1]})')
+                        inv_vs_xor[h] = False
 
-        if sum(condition) == 2:          # 1차로 대충 걸른 후에도 둘다 참이라면 대소비교를 하자
-            if hr < hx:
-                condition[0] = False
+
+        if sum(inv_vs_xor) == 2:    # 출현 헤더수 대소비교를 통해 결정
+            if num_inv_header < num_xor_header:
+                inv_vs_xor[0] = False
             else:
-                condition[1] = False
+                inv_vs_xor[1] = False
 
-        if sum(condition) == 1:                           # 하나 남는다면 확정처리
-            if condition[0] == 1:
+        elif sum(inv_vs_xor) == 1:  # 하나 남는다면 확정처리
+            if inv_vs_xor[0] == 1:
                 detected_scenario = 1 # inv
-            if condition[1] == 1:
+            if inv_vs_xor[1] == 1:
                 detected_scenario = 2 # xor
-            # print('# of %s headers ->' % scenario_list[detected_scenario], hh[h])
-            print(scenario_list[detected_scenario], f'found (inv{hh[0]} vs x_or{hh[1]})' )
+            # print('# of %s headers ->' % scenario_list[detected_scenario], header_count[h])
+            print(scenario_list[detected_scenario], f'found (inv{header_count[0]} vs x_or{header_count[1]})')
             if detected_scenario == 1:
                 None        # video = encode(video, 'inv')
             elif detected_scenario == 2:
@@ -692,17 +559,9 @@ if __name__ == "__main__":  # def sangmin_deep_predict(mode, src):
             print('변형 시나리오는 %s 입니다.' % scenario_list[detected_scenario])
             sys.exit(detected_scenario)
 
-        # # 둘 다 탈락한 경우 렛미트라이로
-        # print('Unknown scenario or codec mismatched!', f'(inv{hh[0]} vs x_or{hh[1]})' )
-        # print('Let me try the second best prediction!')
-        # frequency[frequency.index(max(frequency))] -= 100
-        # if max(frequency) < -99:
-        #     print('판별실패!')
-        #     return   # 모든 코덱 감점먹고 가망없으면 종료
-        # print(codec[frequency.index(max(frequency))])
-        # video = bitstring.BitStream('0b' + video)
-        # detected_scenario, video = scenario_detect(frequency, video, count)
+        else:
+            print('Unknown scenario or codec mismatched!', f'(inv{header_count[0]} vs x_or{header_count[1]})')
+            print('Let me try the second best prediction!')
 
-        # # 둘 다 탈락한 경우 반환값 0
     sys.exit(0)
 
