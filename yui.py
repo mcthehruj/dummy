@@ -186,7 +186,7 @@ class LoadDisplay(object):  # ui 영상창 클래스
                 print("IVC 디코더로 시도")
                 subprocess.run("ldecod_ivc.exe %s tmp_file_%s" % (self.video_source, os.path.splitext(os.path.basename(self.video_source))[0]+'.bit'), stdout=subprocess.DEVNULL)  # 현재폴더에 재인코딩된 임시파일 생성(yuv)
                 list_of_yuv_files = glob('tmp_file_%s*' % os.path.splitext(os.path.basename(self.video_source))[0])     # 이름_resㅇㅇㅇxㅇㅇㅇ.bit
-                if len(list_of_yuv_files) != 0:
+                if '_res' in list_of_yuv_files[0] and '0x0' not in list_of_yuv_files[0]:
                     latest_file = max(list_of_yuv_files, key=os.path.getctime)                                          # 가장최근에 생성된
                     t = latest_file.find('_res')                                                                        # _res 인식
                     width = int((latest_file[t+4:]).split('x')[0])
