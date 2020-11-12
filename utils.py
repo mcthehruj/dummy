@@ -482,7 +482,7 @@ if __name__ == "__main__":
             sec = [hex2bin('ff90')]                                                             # sot
             gop = [hex2bin('ff93')]                                                             # sod
             psc = []                                                                            # siz
-            start = True
+            start = False
 
         elif predicted_codec_.index(max(predicted_codec_)) == 8:                                              # BMP
             ssc = [hex2bin('424d')]                                                             # hd1
