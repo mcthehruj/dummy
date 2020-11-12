@@ -84,7 +84,7 @@ def codec_decide(video_):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = BiLSTM_Attention(n_hidden)
     model.to(device)
-    a = torch.load(glob('Bi-LSTM_97.89.pth')[0], map_location=device)
+    a = torch.load(glob('Bi-LSTM_97.56.pth')[0], map_location=device)
     model.load_state_dict(a)
     model.to(device)
     predicted_codec = [0] * num_classes       # MPEG-2, H.263, H.264,... 의 예측값의 빈도수를 각각 저장
@@ -482,7 +482,7 @@ if __name__ == "__main__":
             sec = [hex2bin('ff90')]                                                             # sot
             gop = [hex2bin('ff93')]                                                             # sod
             psc = []                                                                            # siz
-            start = False
+            start = True
 
         elif predicted_codec_.index(max(predicted_codec_)) == 8:                                              # BMP
             ssc = [hex2bin('424d')]                                                             # hd1
