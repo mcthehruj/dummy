@@ -132,7 +132,7 @@ class LoadDisplay(object):  # ui 영상창 클래스
             return set_srctext_and_return('')
         else:
             self.video_source = src
-
+#.
         canvas_loading.show()
         if self.vid.isOpened():
             self.vid.release()  # 만약 클래스에 이전 영상이 열려있다면, 소멸처리
@@ -166,7 +166,7 @@ class LoadDisplay(object):  # ui 영상창 클래스
                     if '.yuv' in self.video_source:
                         self.vid = VideoCaptureYUV(self.video_source, (288, 352))
                         ret, self.frame = self.vid.read()
-                        print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "(debug) YUV 열기 완료, 이미지는 보이나 인코딩된 상태가 아니기 때문에 시나리오 적용 불가")
+                        print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "YUV 열기 완료")
                         return set_srctext_and_return(self.video_source)
                     else:
                         self.vid = cv2.VideoCapture('errd2.png')
@@ -186,7 +186,7 @@ class LoadDisplay(object):  # ui 영상창 클래스
                 print("IVC 디코더로 시도")
                 subprocess.run("ldecod_ivc.exe %s tmp_file_%s" % (self.video_source, os.path.splitext(os.path.basename(self.video_source))[0]+'.bit'), stdout=subprocess.DEVNULL)  # 현재폴더에 재인코딩된 임시파일 생성(yuv)
                 list_of_yuv_files = glob('tmp_file_%s*' % os.path.splitext(os.path.basename(self.video_source))[0])     # 이름_resㅇㅇㅇxㅇㅇㅇ.bit
-                if len(list_of_yuv_files) != 0:
+                if '_res' in list_of_yuv_files:                                                                         # bit 디코더 정상 동작시
                     latest_file = max(list_of_yuv_files, key=os.path.getctime)                                          # 가장최근에 생성된
                     t = latest_file.find('_res')                                                                        # _res 인식
                     width = int((latest_file[t+4:]).split('x')[0])
@@ -711,6 +711,60 @@ def scenario_inv_act():
 
 
 #########################################################################################################
+#   인코딩 과정
+#   ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -c:v mpeg2video -y akiyo_cif.m2v
+#   ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -c:v h263p -y akiyo_cif.h263
+#   ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -c:v h264 -y akiyo_cif.h264
+#   ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -c:v hevc -y akiyo_cif.hevc
+#   ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -c:v libvpx -y akiyo_cif.webm
+#   lencod_ivc.exe -f encoder_ai.cfg -p InputFile="akiyo_cif_300f.yuv" InputHeaderLength=0 FramesToBeEncoded=30 SourceWidth=352 SourceHeight=288 OutputFile="akiyo_cif.bit"
+#   ffmpeg -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -frames:v 1 -y akiyo_cif.jpg
+#   ffmpeg -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -c:v jpeg2000 -frames:v 1 akiyo_cif.j2k    //      ffmpeg -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -c:v libopenjpeg -frames:v 1 akiyo_cif.j2k
+#   ffmpeg -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -frames:v 1 akiyo_cif.bmp
+#   ffmpeg -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -frames:v 1 akiyo_cif.png
+#   ffmpeg -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -frames:v 1 akiyo_cif.tiff
+#########################################################################################################
+
+def encoding_act(event):            # 이 함수는 input stream 버튼을 눌러도 호출되고 combobox를 선택해도 호출됨 event 인자의 차이
+    if event == 'askmode':          # input stream 버튼을 통한 접근시
+        srcs_g.count = askopenfilenames(initialdir="", filetypes=(("All", "*.yuv"), ("All Files", "*.yuv")), title="Choose a raw file.")
+        srcs = srcs_g.count
+
+        frame3.children['!combobox']['values'] = ("MPEG-2", "H.263", "H.264", "HEVC", "IVC", "VP8", "JPEG", "JPEG2000", "BMP", "PNG", "TIFF")
+        print_dual(text_3_3, f' {len(srcs)}개의 입력 영상을 선택하였습니다.  ')
+        vid5.changevideo(srcs[0])
+        vid = VideoCaptureYUV(srcs[0], (288, 352))
+        ret, frame = vid.read()
+        return
+
+
+    # combobox 리스트를 통한 접근시
+    srcs = srcs_g.count
+    if len(srcs) == 0:  return     # 입력영상을 아직 선택하지 않았을 경우 그냥 아웃
+
+    for iii, seq1 in enumerate(srcs):
+        if seq1 == '' and event.widget.current() != 9:
+            print_dual(text_3_3, 'input stream을 지정해 주세요')
+            return
+        src_plus_name = os.path.splitext(seq1)[0]   # 파일경로+파일이름
+        ext = os.path.splitext(seq1)[1]             # 확장자
+        name = os.path.basename(src_plus_name)      # 파일이름
+
+        print_dual(text_3_3, f'({iii + 1}/{len(srcs)}) {name}{ext}')
+        vid5.changevideo(seq1)                      # 입력영상 띄우기
+
+        if 'MPEG-2' in event.widget.get():  ## 시나리오1 inverse 변조
+            print_dual(text_3_3, 'MPEG-2 인코딩 중입니다..')
+            non_block_threading_popen(text_3_3, "ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i %s.yuv -c:v mpeg2video -y %s.m2v" % (seq1, seq1))
+            vid6.changevideo(src_plus_name + '.m2v')
+            print_dual(text_3_3, '변조가 완료되었습니다.')
+            vid6.changevideo(seq3) if os.path.isfile(seq3) else print_dual(text_3_3, '%s 존재하지 않음' % seq3)  # 더미-히든 실행 후 완료된 파일 vid2에 띄우기
+            print_dual(text_3_3, '변조가 완료되었습니다.')
+
+        print_dual(text_3_3, "　")
+        window.focus_force()
+
+#########################################################################################################
 #   UI 관련 코드
 #########################################################################################################
 def release(event):
@@ -739,6 +793,8 @@ def release(event):
         ddd(vid1, sli1)
     elif event.widget.master.winfo_name() == '!frame2':
         ddd(vid3, sli2)
+    elif event.widget.master.winfo_name() == '!frame3':
+        ddd(vid5, sli3)
 
 
 def sliderdrag(event):
@@ -748,7 +804,7 @@ def sliderdrag(event):
 
 
 window = tkinter.Tk()
-window.title('UI test')
+window.title('GUI for SS-42')
 window.iconbitmap('ho.ico')
 window.geometry("845x705+900+160")
 
@@ -769,7 +825,9 @@ tkinter.ttk.Style().configure("TNotebook", background='#536349')  # 국방색
 notebook = tkinter.ttk.Notebook(window, width=845, height=670)
 notebook.pack()
 
-# Tap 1
+#########################################################################################################
+#   Tap 1
+#########################################################################################################
 frame1 = tkinter.Frame(window)
 notebook.add(frame1, text="변조")
 
@@ -800,7 +858,7 @@ text_1_3.pack()
 # Configure the scrollbars
 yscrollbar.config(command=text_1_3.yview)
 
-sli1 = DoubleVar();
+sli1 = DoubleVar()
 slider_1 = Scale(frame1, from_=1, to=101, orient=HORIZONTAL, length=810, variable=sli1)
 slider_1.bind("<B1-Motion>", sliderdrag)
 slider_1.bind("<ButtonRelease-1>", release)
@@ -809,7 +867,9 @@ slider_1.pack()
 # btn_1_2 = tkinter.Button(frame1, text="ㅁ")
 # btn_1_3 = tkinter.Button(frame1, text=">>")
 
-# Tap 2
+#########################################################################################################
+#   Tap 2
+#########################################################################################################
 frame2 = tkinter.Frame(window)
 notebook.add(frame2, text="복조")
 
@@ -841,11 +901,6 @@ text_2_3.pack()
 yscrollbar.config(command=text_2_3.yview)
 
 # combobox
-# combo_1_1 = Combobox(frame1)
-# combo_1_1['values'] = ("MPEG-2", "H.263", "H.264", "HEVC", "IVC", "VP8", "JPEG", "JPEG2000", "BMP", "PNG", "TIFF")
-# combo_1_1.current(0)  # set the selected item
-
-
 combo_1_2 = Combobox(frame1)
 combo_1_2['values'] = ("Scenario-1 inverse", "Scenario-2 xor", "Scenario-3 더미-히든", "Scenario-4 start code", "Scenario-5 jpg, j2k", "Scenario-6 bmp", "Scenario-7 png", "Scenario-8 tiff")
 combo_1_2.bind("<<ComboboxSelected>>", lambda event: canvas_loading.show() or scenario_act(event) or window.focus_force() or canvas_loading.forget())  # 함수 주소 전달
@@ -854,13 +909,51 @@ combo_1_2.current(0)  # set the selected item
 # combo_1_1.place(x=150, y=0)
 combo_1_2.place(x=150, y=10)
 
-sli2 = DoubleVar();
+sli2 = DoubleVar()
 slider_2 = Scale(frame2, from_=1, to=101, orient=HORIZONTAL, length=810, variable=sli2)
 slider_2.bind("<B1-Motion>", sliderdrag)
 slider_2.bind("<ButtonRelease-1>", release)
 slider_2.pack()
 
-#
+
+#########################################################################################################
+#   Tap 3
+#########################################################################################################
+frame3 = tkinter.Frame(window)
+notebook.add(frame3, text="인코딩")
+
+Origin_labelframe_3 = tkinter.LabelFrame(frame3, text="Raw")
+Modified_labelframe_3 = tkinter.LabelFrame(frame3, text="Encoded")
+States_labelframe_3 = tkinter.LabelFrame(frame3, text="States")
+
+Origin_labelframe_3.pack()
+Modified_labelframe_3.pack()
+States_labelframe_3.pack()
+
+# Vertical (y) Scroll Bar
+yscrollbar = Scrollbar(States_labelframe_3)
+yscrollbar.pack(side="right", fill="both")
+
+text_3_3 = Text(States_labelframe_3, width=113, height=13, wrap=NONE, yscrollcommand=yscrollbar.set)
+text_3_3.insert(tkinter.INSERT, '''''')
+
+text_3_3.pack()
+
+# Configure the scrollbars
+yscrollbar.config(command=text_3_3.yview)
+
+# combobox
+combo_1_3 = Combobox(frame3)
+combo_1_3['values'] = ("MPEG-2", "H.263", "H.264", "HEVC", "IVC", "VP8", "JPEG", "JPEG2000", "BMP", "PNG", "TIFF")
+combo_1_3.bind("<<ComboboxSelected>>", lambda event: canvas_loading.show() or encoding_act(event) or window.focus_force() or canvas_loading.forget())  # 함수 주소 전달
+combo_1_3.current(0)  # set the selected item
+combo_1_3.place(x=150, y=10)
+
+sli3 = DoubleVar()
+slider_3 = Scale(frame3, from_=1, to=101, orient=HORIZONTAL, length=810, variable=sli3)
+slider_3.bind("<B1-Motion>", sliderdrag)
+slider_3.bind("<ButtonRelease-1>", release)
+slider_3.pack()
 
 
 # button click event set
@@ -878,48 +971,54 @@ btn_1_1 = tkinter.Button(frame1, text="input stream", command=lambda: scenario_a
 # text_2_1 = Text(frame2,width = 10,height=1 )
 btn_2_1 = tkinter.Button(frame2, text="restore stream", command=lambda: scenario_inv_act() or window.focus_force())  # 프로세스 종료되면 윈도우가 깜빡이도록 알람
 # btn_2_2 = tkinter.Button(frame2, text="Decode", command=lambda: vid4.detect_inv(text_2_3, os.path.splitext(vid3.video_source)))
-
+btn_3_1 = tkinter.Button(frame3, text="encoding", command=lambda: encoding_act('askmode') or vid5.changevideo('close'))
 
 # button position
-# text_1_1.place(x = 110, y = 5)
 btn_1_1.place(x=10, y=10)
-# btn_1_2.place(x=53, y=0)
-# text_2_1.place(x = 110, y = 5)
 btn_2_1.place(x=10, y=10)
-# btn_2_2.place(x=53, y=0)
-# btn_1_2.place(x=0, y=350)
-# btn_2_2.place(x=0, y=350)
-# btn_1_3.place(x=30, y=350)
-# btn_2_3.place(x=30, y=350)
+btn_3_1.place(x=10, y=10)
 
 # windows positions
 Origin_labelframe_1.place(x=10, y=50)
 Origin_labelframe_2.place(x=10, y=50)
+Origin_labelframe_3.place(x=10, y=50)
 Modified_labelframe_1.place(x=460, y=50)
 Modified_labelframe_2.place(x=460, y=50)
+Modified_labelframe_3.place(x=460, y=50)
 States_labelframe_1.place(x=10, y=450)
 States_labelframe_2.place(x=10, y=450)
+States_labelframe_3.place(x=10, y=450)
 
 slider_1.place(x=10, y=400)
 slider_2.place(x=10, y=400)
+slider_3.place(x=10, y=400)
 
 vid1 = LoadDisplay(Origin_labelframe_1, 0, 0)
 vid2 = LoadDisplay(Modified_labelframe_1, 0, 0)
 vid3 = LoadDisplay(Origin_labelframe_2, 0, 0)
 vid4 = LoadDisplay(Modified_labelframe_2, 0, 0)
+vid5 = LoadDisplay(Origin_labelframe_3, 0, 0)
+vid6 = LoadDisplay(Modified_labelframe_3, 0, 0)
 
 text_1_a = Text(Origin_labelframe_1, width=40, height=1)
-text_1_a.configure(background=window["bg"], border=0);
+text_1_a.configure(background=window["bg"], border=0)
 text_1_a.pack()
-text_1_b = Text(Origin_labelframe_2, width=40, height=1);
-text_1_b.configure(background=window["bg"], border=0);
+text_1_b = Text(Origin_labelframe_2, width=40, height=1)
+text_1_b.configure(background=window["bg"], border=0)
 text_1_b.pack()
-text_2_a = Text(Modified_labelframe_1, width=40, height=1);
-text_2_a.configure(background=window["bg"], border=0);
+text_1_c = Text(Origin_labelframe_3, width=40, height=1)
+text_1_c.configure(background=window["bg"], border=0)
+text_1_c.pack()
+
+text_2_a = Text(Modified_labelframe_1, width=40, height=1)
+text_2_a.configure(background=window["bg"], border=0)
 text_2_a.pack()
-text_2_b = Text(Modified_labelframe_2, width=40, height=1);
-text_2_b.configure(background=window["bg"], border=0);
+text_2_b = Text(Modified_labelframe_2, width=40, height=1)
+text_2_b.configure(background=window["bg"], border=0)
 text_2_b.pack()
+text_2_c = Text(Modified_labelframe_3, width=40, height=1)
+text_2_c.configure(background=window["bg"], border=0)
+text_2_c.pack()
 
 
 class canvas_loding_class:
