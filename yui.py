@@ -204,7 +204,7 @@ class LoadDisplay(object):  # ui 영상창 클래스
                         NewYuv_Askwindow(self)
                         self.vid = VideoCaptureYUV(self.video_source, (self.i_height, self.i_width)); ratio = 352 / self.i_width;  self.zoom_x = ratio;  self.zoom_y = ratio
                         ret, self.frame = self.vid.read()
-                        print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "(debug) YUV 열기 완료, 이미지는 보이나 인코딩된 상태가 아니기 때문에 시나리오 적용 불가")
+                        # print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "(debug) YUV 열기 완료, 이미지는 보이나 인코딩된 상태가 아니기 때문에 시나리오 적용 불가")
                         return set_srctext_and_return(self.video_source)
                     else:
                         self.vid = cv2.VideoCapture('errd2.png')
@@ -763,18 +763,13 @@ def scenario_inv_act():
 #   ffmpeg -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -frames:v 1 akiyo_cif.tiff
 #########################################################################################################
 
-########################################################################################################################
-
-                                                ## 인코더 파트 ##
-
-########################################################################################################################
 
 def encoding_act(event):            # 이 함수는 input stream 버튼을 눌러도 호출되고 combobox를 선택해도 호출됨 event 인자의 차이
     if event == 'askmode':          # input stream 버튼을 통한 접근시
         srcs_g.count = askopenfilenames(initialdir="", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.")
         srcs2 = srcs_g.count
         if len(srcs2) == 0:      # 사용자가 ask 창을 캔슬 누른 경우 아웃
-            frame3.children['!combobox']['values'] = ("인코딩 할 확장자 선택", "yuv to mpeg2", "yuv to h.263", "yuv to h.264", "yuv to hevc", "yuv to vp8", "yuv to bit", "yuv to jpg", "yuv to j2k", "yuv to bmp", "yuv to png", "yuv to tiff")
+            frame3.children['!combobox']['values'] = ("yuv to mpeg2", "yuv to h.263", "yuv to h.264", "yuv to hevc", "yuv to vp8", "yuv to bit", "yuv to jpg", "yuv to j2k", "yuv to bmp", "yuv to png", "yuv to tiff")
             return
 
         if len(srcs2) >= 1:
@@ -1065,7 +1060,7 @@ yscrollbar.config(command=text_3_3.yview)
 
 # combobox
 combo_1_3 = Combobox(frame3)
-combo_1_3['values'] = ("MPEG-2", "H.263", "H.264", "HEVC", "IVC", "VP8", "JPEG", "JPEG2000", "BMP", "PNG", "TIFF")
+combo_1_3['values'] = ("yuv to mpeg2", "yuv to h.263", "yuv to h.264", "yuv to hevc", "yuv to vp8", "yuv to bit", "yuv to jpg", "yuv to j2k", "yuv to bmp", "yuv to png", "yuv to tiff")
 combo_1_3.bind("<<ComboboxSelected>>", lambda event: canvas_loading.show() or encoding_act(event) or window.focus_force() or canvas_loading.forget())  # 함수 주소 전달
 combo_1_3.current(0)  # set the selected item
 combo_1_3.place(x=150, y=10)
@@ -1092,7 +1087,7 @@ btn_1_1 = tkinter.Button(frame1, text="input stream", command=lambda: scenario_a
 # text_2_1 = Text(frame2,width = 10,height=1 )
 btn_2_1 = tkinter.Button(frame2, text="restore stream", command=lambda: scenario_inv_act() or window.focus_force())  # 프로세스 종료되면 윈도우가 깜빡이도록 알람
 # btn_2_2 = tkinter.Button(frame2, text="Decode", command=lambda: vid4.detect_inv(text_2_3, os.path.splitext(vid3.video_source)))
-btn_3_1 = tkinter.Button(frame3, text="encoding", command=lambda: encoding_act('askmode') or vid5.changevideo('close'))
+btn_3_1 = tkinter.Button(frame3, text="encoding", command=lambda: encoding_act('askmode'))
 
 # button position
 btn_1_1.place(x=10, y=10)
