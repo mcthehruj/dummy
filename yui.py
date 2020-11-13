@@ -5,6 +5,7 @@ from tkinter.filedialog import askopenfilename, askopenfilenames
 from tkinter import *
 from tkinter.ttk import *
 import subprocess
+import re
 
 import PIL.Image
 import PIL.ImageTk
@@ -18,6 +19,41 @@ def isHangul(text):
     encText = text
     hanCount = len(re.findall(u'[\u3130-\u318F\uAC00-\uD7A3]+', encText))
     return hanCount > 0
+
+def close_ask(win,vid,w,h):
+    vid.i_width  = int(''.join(list(filter(str.isdigit,w.get(0.0,'end')))))
+    vid.i_height = int(''.join(list(filter(str.isdigit,h.get(0.0,'end')))))
+    win.destroy()
+
+def NewYuv_Askwindow(vid):
+    if re.search('_[0-9]{2,}x[0-9]{2,}', vid.video_source):             # 파일이름에 _숫자x숫자 꼴 존재
+        s = re.search('_[0-9]{2,}x[0-9]{2,}', vid.video_source).regs[0][0] + 1
+        e = re.search('_[0-9]{2,}x[0-9]{2,}', vid.video_source).regs[0][1]
+        vid.i_width  = vid.video_source[s:e].split('x')[0]
+        vid.i_height = vid.video_source[s:e].split('x')[1]
+    else:                                                               # 그렇지 않으면 묻기 창
+        askpop_win = tkinter.Toplevel(window)
+        askpop_win.geometry('260x230')
+        askpop_win.attributes('-topmost', 'true')
+
+        label_0 = tkinter.Label(askpop_win, text="%s \n\n파일에 대한 추가 정보를 입력해 주세요" % vid.video_source , justify='left')
+        label_1 = tkinter.Label(askpop_win, text="해상도:            x")
+        label_2 = tkinter.Label(askpop_win, text="색포맷:  YUV420 only")
+        text_width  = Text(askpop_win, width=5, height=1);  text_width.insert(0.0, "352") ; text_width.tag_configure("right", justify='right');  text_width.tag_add("right", 1.0, "end")
+        text_height = Text(askpop_win, width=5, height=1); text_height.insert(0.0, "288") ; text_height.tag_configure("right", justify='right'); text_height.tag_add("right", 1.0, "end")
+        button_0 = tkinter.Button(askpop_win, text="확인",width=30, height=2, command=lambda: close_ask(askpop_win, vid,text_width,text_height))
+
+        label_0.place(x=10, y=9)
+        label_1.place(x=30, y=80)
+        label_2.place(x=30, y=110)
+        text_width.place(x=78, y=83)
+        text_height.place(x=130, y=83)
+        button_0.place(x=20, y=160)
+
+        while tkinter.Toplevel.winfo_exists(askpop_win): time.sleep(0.1);  askpop_win.update();          # 완료 되기전까진 ask창 잡아두며 리플레시
+
+
+
 
 class VideoCaptureYUV:
     def __init__(self, filename, size):
@@ -132,7 +168,7 @@ class LoadDisplay(object):  # ui 영상창 클래스
             return set_srctext_and_return('')
         else:
             self.video_source = src
-#.
+
         canvas_loading.show()
         if self.vid.isOpened():
             self.vid.release()  # 만약 클래스에 이전 영상이 열려있다면, 소멸처리
@@ -160,13 +196,15 @@ class LoadDisplay(object):  # ui 영상창 클래스
                     time.sleep(0.01)
                     sli1.set(0)
                     sli2.set(0)
+                    sli3.set(0)
                     canvas_loading.forget()
                     return set_srctext_and_return(self.video_source)
                 else:  # imread로 열기 실패
                     if '.yuv' in self.video_source:
-                        self.vid = VideoCaptureYUV(self.video_source, (288, 352))
+                        NewYuv_Askwindow(self)
+                        self.vid = VideoCaptureYUV(self.video_source, (self.i_height, self.i_width)); ratio = 352 / self.i_width;  self.zoom_x = ratio;  self.zoom_y = ratio
                         ret, self.frame = self.vid.read()
-                        print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "YUV 열기 완료")
+                        print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "(debug) YUV 열기 완료, 이미지는 보이나 인코딩된 상태가 아니기 때문에 시나리오 적용 불가")
                         return set_srctext_and_return(self.video_source)
                     else:
                         self.vid = cv2.VideoCapture('errd2.png')
@@ -186,7 +224,7 @@ class LoadDisplay(object):  # ui 영상창 클래스
                 print("IVC 디코더로 시도")
                 subprocess.run("ldecod_ivc.exe %s tmp_file_%s" % (self.video_source, os.path.splitext(os.path.basename(self.video_source))[0]+'.bit'), stdout=subprocess.DEVNULL)  # 현재폴더에 재인코딩된 임시파일 생성(yuv)
                 list_of_yuv_files = glob('tmp_file_%s*' % os.path.splitext(os.path.basename(self.video_source))[0])     # 이름_resㅇㅇㅇxㅇㅇㅇ.bit
-                if '_res' in list_of_yuv_files:                                                                         # bit 디코더 정상 동작시
+                if '_res' in list_of_yuv_files[0] and '0x0' not in list_of_yuv_files[0]:
                     latest_file = max(list_of_yuv_files, key=os.path.getctime)                                          # 가장최근에 생성된
                     t = latest_file.find('_res')                                                                        # _res 인식
                     width = int((latest_file[t+4:]).split('x')[0])
@@ -725,44 +763,127 @@ def scenario_inv_act():
 #   ffmpeg -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -frames:v 1 akiyo_cif.tiff
 #########################################################################################################
 
+########################################################################################################################
+
+                                                ## 인코더 파트 ##
+
+########################################################################################################################
+
 def encoding_act(event):            # 이 함수는 input stream 버튼을 눌러도 호출되고 combobox를 선택해도 호출됨 event 인자의 차이
     if event == 'askmode':          # input stream 버튼을 통한 접근시
-        srcs_g.count = askopenfilenames(initialdir="", filetypes=(("All", "*.yuv"), ("All Files", "*.yuv")), title="Choose a raw file.")
-        srcs = srcs_g.count
+        srcs_g.count = askopenfilenames(initialdir="", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.")
+        srcs2 = srcs_g.count
+        if len(srcs2) == 0:      # 사용자가 ask 창을 캔슬 누른 경우 아웃
+            frame3.children['!combobox']['values'] = ("인코딩 할 확장자 선택", "yuv to mpeg2", "yuv to h.263", "yuv to h.264", "yuv to hevc", "yuv to vp8", "yuv to bit", "yuv to jpg", "yuv to j2k", "yuv to bmp", "yuv to png", "yuv to tiff")
+            return
 
-        frame3.children['!combobox']['values'] = ("MPEG-2", "H.263", "H.264", "HEVC", "IVC", "VP8", "JPEG", "JPEG2000", "BMP", "PNG", "TIFF")
-        print_dual(text_3_3, f' {len(srcs)}개의 입력 영상을 선택하였습니다.  ')
-        vid5.changevideo(srcs[0])
-        vid = VideoCaptureYUV(srcs[0], (288, 352))
-        ret, frame = vid.read()
-        return
-
+        if len(srcs2) >= 1:
+            print_dual(text_3_3, f' {len(srcs2)}개의 입력 영상을 선택하였습니다.  ')
+            vid5.changevideo(srcs2[0])
+            return
 
     # combobox 리스트를 통한 접근시
-    srcs = srcs_g.count
-    if len(srcs) == 0:  return     # 입력영상을 아직 선택하지 않았을 경우 그냥 아웃
+    srcs2 = srcs_g.count
+    if len(srcs2) == 0:  return     # 입력영상을 아직 선택하지 않았을 경우 그냥 아웃
 
-    for iii, seq1 in enumerate(srcs):
-        if seq1 == '' and event.widget.current() != 9:
-            print_dual(text_3_3, 'input stream을 지정해 주세요')
-            return
-        src_plus_name = os.path.splitext(seq1)[0]   # 파일경로+파일이름
-        ext = os.path.splitext(seq1)[1]             # 확장자
-        name = os.path.basename(src_plus_name)      # 파일이름
+    for iii, seq3 in enumerate(srcs2):
+        if seq3 == '' and event.widget.current() != 9: print_dual(text_3_3, 'input stream을 지정해 주세요');   return
 
-        print_dual(text_3_3, f'({iii + 1}/{len(srcs)}) {name}{ext}')
-        vid5.changevideo(seq1)                      # 입력영상 띄우기
+        vid5.changevideo(seq3)  # 입력영상 띄우기          # yuv 파일의 경우 src입력 영상을 띄우는 순간  ->   파일이름을통한 가로세로길이인식과정 or 가로세로 ask창 뜸   -> 이 때 i_width i_height 완성
+        width2 = vid5.i_width
+        height2 = vid5.i_height
 
-        if 'MPEG-2' in event.widget.get():  ## 시나리오1 inverse 변조
-            print_dual(text_3_3, 'MPEG-2 인코딩 중입니다..')
-            non_block_threading_popen(text_3_3, "ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i %s.yuv -c:v mpeg2video -y %s.m2v" % (seq1, seq1))
-            vid6.changevideo(src_plus_name + '.m2v')
-            print_dual(text_3_3, '변조가 완료되었습니다.')
-            vid6.changevideo(seq3) if os.path.isfile(seq3) else print_dual(text_3_3, '%s 존재하지 않음' % seq3)  # 더미-히든 실행 후 완료된 파일 vid2에 띄우기
-            print_dual(text_3_3, '변조가 완료되었습니다.')
+        src_plus_name2 = os.path.splitext(seq3)[0]   # 파일경로+파일이름
+        ext2 = os.path.splitext(seq3)[1]             # 확장자
+        name2 = os.path.basename(src_plus_name2)      # 파일이름
+
+
+
+        print_dual(text_3_3, f'({iii + 1}/{len(srcs2)}) {name2}{ext2}')
+
+
+        if 'yuv to mpeg2' in event.widget.get():  ## yuv to mpeg2
+            print_dual(text_3_3, 'yuv → mpeg2 인코딩 중 입니다..')
+            subprocess.run("ffmpeg.exe -f rawvideo -s %sx%s -pix_fmt yuv420p -i %s -c:v mpeg2video -y %s.m2v" % (
+                width2, height2, seq3, src_plus_name2), stdout=subprocess.DEVNULL)
+            vid6.changevideo(src_plus_name2 + '.m2v')
+            print_dual(text_3_3, '인코딩이 완료되었습니다.')
+
+        elif 'yuv to h.263' in event.widget.get():  ## yuv to h.263
+            print_dual(text_3_3, 'yuv → h.263 인코딩 중 입니다..')
+            subprocess.run("ffmpeg.exe -f rawvideo -s %sx%s -pix_fmt yuv420p -i %s -c:v h263p -y %s.h263" % (
+                width2, height2, seq3, src_plus_name2), stdout=subprocess.DEVNULL)
+            vid6.changevideo(src_plus_name2 + '.h263')
+            print_dual(text_3_3, '인코딩이 완료되었습니다.')
+
+        elif 'yuv to h.264' in event.widget.get():  ## yuv to h.264
+            print_dual(text_3_3, 'yuv → h.264 인코딩 중 입니다..')
+            subprocess.run("ffmpeg.exe -f rawvideo -s %sx%s -pix_fmt yuv420p -i %s -c:v h264 -y %s.h264" % (
+                width2, height2, seq3, src_plus_name2), stdout=subprocess.DEVNULL)
+            vid6.changevideo(src_plus_name2 + '.h264')
+            print_dual(text_3_3, '인코딩이 완료되었습니다.')
+
+        elif 'yuv to hevc' in event.widget.get():  ## yuv to hevc
+            print_dual(text_3_3, 'yuv → hevc 인코딩 중 입니다..')
+            subprocess.run("ffmpeg.exe -f rawvideo -s %sx%s -pix_fmt yuv420p -i %s -c:v hevc -y %s.hevc" % (
+                width2, height2, seq3, src_plus_name2), stdout=subprocess.DEVNULL)
+            vid6.changevideo(src_plus_name2 + '.hevc')
+            print_dual(text_3_3, '인코딩이 완료되었습니다.')
+
+        elif 'yuv to vp8' in event.widget.get():  ## yuv to vp8
+            print_dual(text_3_3, 'yuv → vp8 인코딩 중 입니다..')
+            subprocess.run("ffmpeg.exe -f rawvideo -s %sx%s -pix_fmt yuv420p -i %s -c:v libvpx -y %s.webm" % (
+                width2, height2, seq3, src_plus_name2), stdout=subprocess.DEVNULL)
+            vid6.changevideo(src_plus_name2 + '.webm')
+            print_dual(text_3_3, '인코딩이 완료되었습니다.')
+
+        elif 'yuv to bit' in event.widget.get():  ## yuv to bit
+            print_dual(text_3_3, 'yuv → bit 인코딩 중 입니다..')
+            subprocess.run("lencod_ivc.exe -f encoder_ai.cfg -p InputFile=%s InputHeaderLength=0 FramesToBeEncoded=30 SourceWidth=%s SourceHeight=%s OutputFile=%s.bit" % (
+                seq3, width2, height2, src_plus_name2), stdout=subprocess.DEVNULL)
+            vid6.changevideo(src_plus_name2 + '.bit')
+            print_dual(text_3_3, '인코딩이 완료되었습니다.')
+
+        elif 'yuv to jpg' in event.widget.get():  ## yuv to jpg
+            print_dual(text_3_3, 'yuv → jpg 인코딩 중 입니다..')
+            subprocess.run("ffmpeg.exe -f rawvideo -s %sx%s -pix_fmt yuv420p -i %s -frames:v 1 -y %s.jpg" % (
+                width2, height2, seq3, src_plus_name2), stdout=subprocess.DEVNULL)
+            vid6.changevideo(src_plus_name2 + '.jpg')
+            print_dual(text_3_3, '인코딩이 완료되었습니다.')
+
+        elif 'yuv to j2k' in event.widget.get():  ## yuv to j2k
+            print_dual(text_3_3, 'yuv → j2k 인코딩 중 입니다..')
+            subprocess.run("ffmpeg.exe -f rawvideo -s %sx%s -pix_fmt yuv420p -i %s -c:v jpeg2000 -y %s.j2k" % (
+                width2, height2, seq3, src_plus_name2), stdout=subprocess.DEVNULL)
+            vid6.changevideo(src_plus_name2 + '.j2k')
+            print_dual(text_3_3, '인코딩이 완료되었습니다.')
+
+        elif 'yuv to bmp' in event.widget.get():  ## yuv to bmp
+            print_dual(text_3_3, 'yuv → bmp 인코딩 중 입니다..')
+            subprocess.run("ffmpeg.exe -f rawvideo -s %sx%s -pix_fmt yuv420p -i %s -frames:v 1 -y %s.bmp" % (
+                width2, height2, seq3, src_plus_name2), stdout=subprocess.DEVNULL)
+            vid6.changevideo(src_plus_name2 + '.bmp')
+            print_dual(text_3_3, '인코딩이 완료되었습니다.')
+
+        elif 'yuv to png' in event.widget.get():  ## yuv to png
+            print_dual(text_3_3, 'yuv → png 인코딩 중 입니다..')
+            subprocess.run("ffmpeg.exe -f rawvideo -s %sx%s -pix_fmt yuv420p -i %s -frames:v 1 -y %s.png" % (
+                width2, height2, seq3, src_plus_name2), stdout=subprocess.DEVNULL)
+            vid6.changevideo(src_plus_name2 + '.png')
+            print_dual(text_3_3, '인코딩이 완료되었습니다.')
+
+        elif 'yuv to tiff' in event.widget.get():  ## yuv to tiff
+            print_dual(text_3_3, 'yuv → tiff 인코딩 중 입니다..')
+            subprocess.run("ffmpeg.exe -f rawvideo -s %sx%s -pix_fmt yuv420p -i %s -frames:v 1 -y %s.tiff" % (
+                width2, height2, seq3, src_plus_name2), stdout=subprocess.DEVNULL)
+            vid6.changevideo(src_plus_name2 + '.tiff')
+            print_dual(text_3_3, '인코딩이 완료되었습니다.')
+
 
         print_dual(text_3_3, "　")
         window.focus_force()
+        # winsound.PlaySound('SystemQuestion', winsound.SND_ALIAS)  # 사운드에 딜레이가 포함되어 있음
+        # time.sleep(0.5)
 
 #########################################################################################################
 #   UI 관련 코드
