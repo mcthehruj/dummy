@@ -6,6 +6,7 @@ from tkinter import *
 from tkinter.ttk import *
 import subprocess
 import re
+import os
 
 import PIL.Image
 import PIL.ImageTk
@@ -51,6 +52,9 @@ def NewYuv_Askwindow(vid):
         button_0.place(x=20, y=160)
 
         while tkinter.Toplevel.winfo_exists(askpop_win): time.sleep(0.1);  askpop_win.update();          # 완료 되기전까진 ask창 잡아두며 리플레시
+
+    vid.frame_count = os.path.getsize(vid.video_source) // int(vid.i_width * vid.i_height * 1.5)                  # 프레임수 입력
+
 
 
 
@@ -142,6 +146,9 @@ class LoadDisplay(object):  # ui 영상창 클래스
 
     def changevideo(self, src=''):
 
+        if self.video_source == src:
+            return                                      # changevideo를 통해 처음 영상을 띄울 때와 실제연산이 시작될때 두번호출될 경우가 생긴다.  두번째호출될경우 그냥 넘어가기위함..
+
         def set_srctext_and_return(s):
             srctext = os.path.basename(s)               # 파일이름 출력용
             text = self.win.children['!text']
@@ -204,7 +211,8 @@ class LoadDisplay(object):  # ui 영상창 클래스
                         NewYuv_Askwindow(self)
                         self.vid = VideoCaptureYUV(self.video_source, (self.i_height, self.i_width)); ratio = 352 / self.i_width;  self.zoom_x = ratio;  self.zoom_y = ratio
                         ret, self.frame = self.vid.read()
-                        print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "(debug) YUV 열기 완료, 이미지는 보이나 인코딩된 상태가 아니기 때문에 시나리오 적용 불가")
+                        #print_dual(self.canvas.master.master.children['!labelframe3'].children['!text'], "(debug) YUV 열기 완료, 이미지는 보이나 인코딩된 상태가 아니기 때문에 시나리오 적용 불가")
+                        print('(debug) YUV 열기 완료')
                         return set_srctext_and_return(self.video_source)
                     else:
                         self.vid = cv2.VideoCapture('errd2.png')
@@ -222,10 +230,11 @@ class LoadDisplay(object):  # ui 영상창 클래스
             if self.frame is None:  # 파일은 존재하지만 디코딩이 실패 -> IVC 디코더로 시도
                 self.vid.release()
                 print("IVC 디코더로 시도")
-                subprocess.run("ldecod_ivc.exe %s tmp_file_%s" % (self.video_source, os.path.splitext(os.path.basename(self.video_source))[0]+'.bit'), stdout=subprocess.DEVNULL)  # 현재폴더에 재인코딩된 임시파일 생성(yuv)
-                list_of_yuv_files = glob('tmp_file_%s*' % os.path.splitext(os.path.basename(self.video_source))[0])     # 이름_resㅇㅇㅇxㅇㅇㅇ.bit
-                if '_res' in list_of_yuv_files[0] and '0x0' not in list_of_yuv_files[0]:
-                    latest_file = max(list_of_yuv_files, key=os.path.getctime)                                          # 가장최근에 생성된
+                for filename in glob("tmp_file*.bit"): os.remove(filename)                                                      # ivc 디코더가 동일파일일 경우 파일을 생성 안하는것 같으니.. 미리 템프파일을 삭제하는 코드를 넣는다
+                subprocess.run("ldecod_ivc.exe %s tmp_file_%s" % (self.video_source, os.path.splitext(os.path.basename(self.video_source))[0]+'.bit'), stdout=subprocess.DEVNULL)  # 현재폴더에 IVC디코더를 통한 yuv 임시파일 생성     : _res 가 붙음
+                list_of_yuv_files = glob('tmp_file_%s*.bit' % os.path.splitext(os.path.basename(self.video_source))[0])             # 이름_resㅇㅇㅇxㅇㅇㅇ.bit 를 찾아서 열기 위해 glob *
+                latest_file = min(list_of_yuv_files, key=os.path.getmtime)                                                      # 가장최근에 생성된
+                if '_res' in latest_file and '0x0' not in latest_file:
                     width = int(re.findall("\d+", latest_file)[-2])
                     height = int(re.findall("\d+", latest_file)[-1])
                     yuv_src = 'tmp_file_' + os.path.splitext(os.path.basename(self.video_source))[0] + '_res%dx%d' %(width,height) + '.bit'
@@ -770,10 +779,10 @@ def scenario_inv_act():
 
 def encoding_act(event):            # 이 함수는 input stream 버튼을 눌러도 호출되고 combobox를 선택해도 호출됨 event 인자의 차이
     if event == 'askmode':          # input stream 버튼을 통한 접근시
-        srcs_g.count = askopenfilenames(initialdir="", filetypes=(("All", "*.*"), ("All Files", "*.*")), title="Choose a file.")
+        srcs_g.count = askopenfilenames(initialdir="", filetypes=(("All", "*.yuv"), ("All Files", "*.yuv")), title="Choose a file.")
         srcs2 = srcs_g.count
         if len(srcs2) == 0:      # 사용자가 ask 창을 캔슬 누른 경우 아웃
-            frame3.children['!combobox']['values'] = ("인코딩 할 확장자 선택", "yuv to mpeg2", "yuv to h.263", "yuv to h.264", "yuv to hevc", "yuv to vp8", "yuv to bit", "yuv to jpg", "yuv to j2k", "yuv to bmp", "yuv to png", "yuv to tiff")
+            frame3.children['!combobox']['values'] = ("yuv to mpeg2", "yuv to h.263", "yuv to h.264", "yuv to hevc", "yuv to vp8", "yuv to bit", "yuv to jpg", "yuv to j2k", "yuv to bmp", "yuv to png", "yuv to tiff")
             return
 
         if len(srcs2) >= 1:
@@ -783,7 +792,7 @@ def encoding_act(event):            # 이 함수는 input stream 버튼을 눌�
 
     # combobox 리스트를 통한 접근시
     srcs2 = srcs_g.count
-    if len(srcs2) == 0:  return     # 입력영상을 아직 선택하지 않았을 경우 그냥 아웃
+    if len(srcs2) == 0: print_dual(text_3_3, 'input stream을 지정해 주세요');   return     # 입력영상을 아직 선택하지 않았을 경우 그냥 아웃
 
     for iii, seq3 in enumerate(srcs2):
         if seq3 == '' and event.widget.current() != 9: print_dual(text_3_3, 'input stream을 지정해 주세요');   return
@@ -791,6 +800,7 @@ def encoding_act(event):            # 이 함수는 input stream 버튼을 눌�
         vid5.changevideo(seq3)  # 입력영상 띄우기          # yuv 파일의 경우 src입력 영상을 띄우는 순간  ->   파일이름을통한 가로세로길이인식과정 or 가로세로 ask창 뜸   -> 이 때 i_width i_height 완성
         width2 = vid5.i_width
         height2 = vid5.i_height
+        fcount = vid5.frame_count
 
         src_plus_name2 = os.path.splitext(seq3)[0]   # 파일경로+파일이름
         ext2 = os.path.splitext(seq3)[1]             # 확장자
@@ -838,8 +848,7 @@ def encoding_act(event):            # 이 함수는 input stream 버튼을 눌�
 
         elif 'yuv to bit' in event.widget.get():  ## yuv to bit
             print_dual(text_3_3, 'yuv → bit 인코딩 중 입니다..')
-            subprocess.run("lencod_ivc.exe -f encoder_ai.cfg -p InputFile=%s InputHeaderLength=0 FramesToBeEncoded=30 SourceWidth=%s SourceHeight=%s OutputFile=%s.bit" % (
-                seq3, width2, height2, src_plus_name2), stdout=subprocess.DEVNULL)
+            non_block_threading_popen(text_3_3, f"lencod_ivc.exe -f encoder_ai.cfg -p InputFile={seq3} InputHeaderLength=0 FramesToBeEncoded={fcount} SourceWidth={width2} SourceHeight={height2} OutputFile={src_plus_name2}.bit")
             vid6.changevideo(src_plus_name2 + '.bit')
             print_dual(text_3_3, '인코딩이 완료되었습니다.')
 
@@ -1056,15 +1065,17 @@ yscrollbar.pack(side="right", fill="both")
 
 text_3_3 = Text(States_labelframe_3, width=113, height=13, wrap=NONE, yscrollcommand=yscrollbar.set)
 text_3_3.insert(tkinter.INSERT, '''''')
-
 text_3_3.pack()
+
+text_3_3t = Text(frame3, width=113, height=2, wrap=NONE, yscrollcommand=yscrollbar.set)
+text_3_3t.place(x=10, y=666)
 
 # Configure the scrollbars
 yscrollbar.config(command=text_3_3.yview)
 
 # combobox
 combo_1_3 = Combobox(frame3)
-combo_1_3['values'] = ("MPEG-2", "H.263", "H.264", "HEVC", "IVC", "VP8", "JPEG", "JPEG2000", "BMP", "PNG", "TIFF")
+combo_1_3['values'] = ("yuv to mpeg2", "yuv to h.263", "yuv to h.264", "yuv to hevc", "yuv to vp8", "yuv to bit", "yuv to jpg", "yuv to j2k", "yuv to bmp", "yuv to png", "yuv to tiff")
 combo_1_3.bind("<<ComboboxSelected>>", lambda event: canvas_loading.show() or encoding_act(event) or window.focus_force() or canvas_loading.forget())  # 함수 주소 전달
 combo_1_3.current(0)  # set the selected item
 combo_1_3.place(x=150, y=10)
@@ -1091,7 +1102,7 @@ btn_1_1 = tkinter.Button(frame1, text="input stream", command=lambda: scenario_a
 # text_2_1 = Text(frame2,width = 10,height=1 )
 btn_2_1 = tkinter.Button(frame2, text="restore stream", command=lambda: scenario_inv_act() or window.focus_force())  # 프로세스 종료되면 윈도우가 깜빡이도록 알람
 # btn_2_2 = tkinter.Button(frame2, text="Decode", command=lambda: vid4.detect_inv(text_2_3, os.path.splitext(vid3.video_source)))
-btn_3_1 = tkinter.Button(frame3, text="encoding", command=lambda: encoding_act('askmode') or vid5.changevideo('close'))
+btn_3_1 = tkinter.Button(frame3, text="encoding", command=lambda: encoding_act('askmode'))
 
 # button position
 btn_1_1.place(x=10, y=10)
