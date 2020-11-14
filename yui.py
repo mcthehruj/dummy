@@ -226,9 +226,8 @@ class LoadDisplay(object):  # ui 영상창 클래스
                 list_of_yuv_files = glob('tmp_file_%s*' % os.path.splitext(os.path.basename(self.video_source))[0])     # 이름_resㅇㅇㅇxㅇㅇㅇ.bit
                 if '_res' in list_of_yuv_files[0] and '0x0' not in list_of_yuv_files[0]:
                     latest_file = max(list_of_yuv_files, key=os.path.getctime)                                          # 가장최근에 생성된
-                    t = latest_file.find('_res')                                                                        # _res 인식
-                    width = int((latest_file[t+4:]).split('x')[0])
-                    height = int((latest_file[t+4:]).split('x')[1].split('.')[0])
+                    width = int(re.findall("\d+", latest_file)[-2])
+                    height = int(re.findall("\d+", latest_file)[-1])
                     yuv_src = 'tmp_file_' + os.path.splitext(os.path.basename(self.video_source))[0] + '_res%dx%d' %(width,height) + '.bit'
                     yuv_srcn = 'tmp_file_' + os.path.splitext(os.path.basename(self.video_source))[0]
                     subprocess.run("ffmpeg.exe -f rawvideo -s %dx%d -pix_fmt yuv420p -i %s -c:v hevc -y %s.hevc" % (width, height, yuv_src, yuv_srcn), stdout=subprocess.DEVNULL)
