@@ -9,7 +9,7 @@ import sys
 import shutil
 
 
-def Distortion(filename):
+def Distortion(filename): # 입력 bmp 파일 변형
     with open(filename, 'rb') as b:
         bmp_bytes = b.read()
 
@@ -21,7 +21,7 @@ def Distortion(filename):
     biWidth_int = int.from_bytes(biWidth, 'little')
     biHeight_int = int.from_bytes(biHeight, 'little')
 
-    candidates = [200, 300, 400, 500]
+    candidates = [200, 300, 400, 500] # 변형 가능한 해상도 경우의 수
 
     candidate_res = candidates[random.randint(0, 3)]
     modified_biWidth = int(biWidth_int + candidate_res).to_bytes(2, byteorder='little')
@@ -34,7 +34,7 @@ def Distortion(filename):
 
     # return modulated
 
-def Candidate_BMP(Bin_BMP):
+def Candidate_BMP(Bin_BMP): # 변형된 bmp 파일 입력에 대한 복원 후보 생성
     candidates = [200, 300, 400, 500]
 
     BMP_header_chunk_length = 14
@@ -58,7 +58,7 @@ def Candidate_BMP(Bin_BMP):
                 f.write(fixed)
 
 
-def Restoration(fn):
+def Restoration(fn): # 변형된 bmp 파일 복원
     if not os.path.exists('tmp'):
         os.mkdir('tmp')
 
@@ -86,7 +86,7 @@ def Restoration(fn):
     shutil.copy('tmp/Candidates_%d%s' % (restore_idx+1, ext), fn.replace('_Distorted', '_Restored'))
 
 
-def Check(fn):
+def Check(fn): # 복원 시나리오 적용 여부 판단
     if not os.path.exists('tmp'):
         os.mkdir('tmp')
 

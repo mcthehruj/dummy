@@ -29,8 +29,8 @@ def NewYuv_Askwindow(vid):
     if re.search('_[0-9]{2,}x[0-9]{2,}', vid.video_source):             # 파일이름에 _숫자x숫자 꼴 존재
         s = re.search('_[0-9]{2,}x[0-9]{2,}', vid.video_source).regs[0][0] + 1
         e = re.search('_[0-9]{2,}x[0-9]{2,}', vid.video_source).regs[0][1]
-        vid.i_width  = vid.video_source[s:e].split('x')[0]
-        vid.i_height = vid.video_source[s:e].split('x')[1]
+        vid.i_width  = int(vid.video_source[s:e].split('x')[0])
+        vid.i_height = int(vid.video_source[s:e].split('x')[1])
     else:                                                               # 그렇지 않으면 묻기 창
         askpop_win = tkinter.Toplevel(window)
         askpop_win.geometry('260x230')
@@ -994,7 +994,7 @@ frame2 = tkinter.Frame(window)
 notebook.add(frame2, text="복조")
 
 Origin_labelframe_2 = tkinter.LabelFrame(frame2, text="Modified")
-Modified_labelframe_2 = tkinter.LabelFrame(frame2, text="Recovered")
+Modified_labelframe_2 = tkinter.LabelFrame(frame2, text="Restored")
 States_labelframe_2 = tkinter.LabelFrame(frame2, text="States")
 
 Origin_labelframe_2.pack()

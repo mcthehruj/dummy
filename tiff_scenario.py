@@ -8,14 +8,14 @@ import sys
 import JPEG
 import shutil
 
-byte_comp_type={
+byte_comp_type={  # 변형 및 복원 가능한 압축 형식
     b'\x05\x80': 1,  # packbits
     b'\x01\x00': 2,  # none
     b'\x05\x00': 3,  # lzw
     b'\x08\x00': 4   # deflate
     }
 
-def Distortion(filename):
+def Distortion(filename): # 입력된 tiff 영상 변형
     with open(filename, 'rb') as b:
         bdata = b.read()
 
@@ -31,7 +31,7 @@ def Distortion(filename):
                       hex(0)[2:] + hex(8)[2:] + hex(0)[2:] + hex(0)[2:]]  # deflate
 
     distortion_index = input_compression - 1
-    while distortion_index == input_compression - 1:
+    while distortion_index == input_compression - 1: # 입력 영상과 다른 압축 형식으로 변형
         distortion_index = random.randint(0, 3)
 
     modulated = utils.Fix_Byte_Stream(bdata, distortion_val[distortion_index], loc[0])
@@ -40,7 +40,7 @@ def Distortion(filename):
     # return modulated
 
 
-def Restoration(fn):
+def Restoration(fn): # 입력된 변형 tiff 영상 복원
     if not os.path.exists('tmp'):
         os.mkdir('tmp')
 
@@ -61,6 +61,8 @@ def Restoration(fn):
                 score_list.append(99999)
             else:
                 img = cv2.equalizeHist(img)
+                kernel = np.ones((5, 5), np.float32) / 5
+                img = cv2.filter2D(img, -1, kernel)
                 score_list.append(np.nan_to_num(brisque.get_score(img)))
         except:
             score_list.append(99999)
@@ -80,7 +82,7 @@ def Restoration(fn):
     shutil.copy('tmp/Candidates_%d%s' % (restore_idx+1, ext), fn.replace('_Distorted', '_Restored'))
 
 
-def Candidate_TIFF(Bin_TIFF):
+def Candidate_TIFF(Bin_TIFF): # 입력된 변형 tiff 영상에 대한 복원 후보 영상 생성
     marker = b'\x03\x01\x03\x00\x01\x00\x00\x00'
     loc = utils.Find_Marker(Bin_TIFF, marker)
 
@@ -93,7 +95,7 @@ def Candidate_TIFF(Bin_TIFF):
         with open('tmp/Candidates_{}.tiff'.format(dist+1), 'wb') as f:
             f.write(fixed)
 
-def Check(fn):
+def Check(fn): # 복원 시나리오 적용 여부 판단
     if not os.path.exists('tmp'):
         os.mkdir('tmp')
 

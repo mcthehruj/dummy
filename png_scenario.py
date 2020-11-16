@@ -16,11 +16,11 @@ def I4(value):
     return struct.pack("!I", value & (2 ** 32 - 1))
 
 
-def Distortion(filename, new_stream=b'\x9d\xe5', new_stream_2nd=b'\x8c\xd4'):
+def Distortion(filename, new_stream=b'\x9d\xe5', new_stream_2nd=b'\x8c\xd4'): # 입력된 png 영상 변형
     f = open(filename, 'rb')
     png_bytes = f.read()
 
-    case_list = [
+    case_list = [ # 변형 가능한 위치 2가지 중 1 값을 갖는 위치의 비트만 변형
         [0, 1],
         [1, 0],
         [1, 1]
@@ -30,7 +30,7 @@ def Distortion(filename, new_stream=b'\x9d\xe5', new_stream_2nd=b'\x8c\xd4'):
     loc_IDAT = utils.Find_Marker(png_bytes, marker_IDAT)
     IDAT_chunk_length = int.from_bytes(png_bytes[loc_IDAT[0] - 4:loc_IDAT[0]], 'big')
 
-    case = case_list[random.randint(0, 2)]
+    case = case_list[random.randint(0, 2)] # case 선택하여 선택된 위치의 비트 변형
     check_stream = b'\xaa\xbb\xcc\xdd'
     png_bytes = bytes.fromhex(png_bytes.hex() + check_stream.hex())
     ## modify chunk value : png byte stream / new stream / modifying location
@@ -53,15 +53,15 @@ def Distortion(filename, new_stream=b'\x9d\xe5', new_stream_2nd=b'\x8c\xd4'):
             fixed = bytes.fromhex(fixed.hex() + dummy_stream_2nd.hex())
 
     ## modify crc
-    modified_IDAT = fixed[loc_IDAT[0]:loc_IDAT[0] + IDAT_chunk_length + 4]
-    modified_IDAT_crc = I4(zlib.crc32(modified_IDAT))
+    modified_IDAT = fixed[loc_IDAT[0]:loc_IDAT[0] + IDAT_chunk_length + 4] # IDAT 청크 변형
+    modified_IDAT_crc = I4(zlib.crc32(modified_IDAT)) # 변형된 IDAT 청크에 맞게 CRC 비트 변형
     modulated, orig_crc = utils.Fix_Byte_Stream_v2(fixed, modified_IDAT_crc, loc_IDAT[0] + IDAT_chunk_length + 4)
 
     JPEG.Write_bin(filename.replace('.png', '_Distorted.png'), modulated)
     # return modulated
 
 
-def Restoration(filename):
+def Restoration(filename): # 입력된 변형 png 영상 복원
     brisque = BRISQUE()
     ext = os.path.splitext(filename)[1]
 
@@ -75,7 +75,7 @@ def Restoration(filename):
     fp = open(filename, 'rb')
     png_bytes = fp.read()
 
-    orig_streams = png_bytes[-8:].hex()
+    orig_streams = png_bytes[-8:].hex() # 비트스트림에 저장된 복원 비트 취득
     orig_stream_1st = binascii.unhexlify(orig_streams[-8:-4])
     orig_stream_2nd = binascii.unhexlify(orig_streams[-4:])
 
@@ -84,7 +84,7 @@ def Restoration(filename):
     IDAT_chunk_length = int.from_bytes(png_bytes[loc_IDAT[0] - 4:loc_IDAT[0]], 'big')
 
     ## modify chunk value
-    for case_idx, case in enumerate(case_list):
+    for case_idx, case in enumerate(case_list): # 각 복원 case 별 후보 영상 생성하여 복원
 
         if case_idx == 0:
             f = open(filename, 'rb')
@@ -174,7 +174,7 @@ def Restoration(filename):
     # os.remove('tmp/orig_streams.txt'.format())
 
 
-def Check(filename):
+def Check(filename): # 복원 시나리오 적용 여부 판단
     fp = open(filename, 'rb')
     png_bytes = fp.read()
 
