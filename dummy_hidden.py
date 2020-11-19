@@ -65,8 +65,7 @@ def codecdecision(seq):
 
     return [seq0, seq1, seq2, seq3, seq4][cdx], cdx
 
-
-#### goto 1:변조모드로    2:복조모드로    3:변조여부판단모드로    4:인자오류메세지출력으로
+#### goto 1:변조 모드    2:복조 모드    3:변조여부 판단모드    4:인자 오류 메세지출력
 
 if (len(sys.argv) == 1):
     goto = 4
@@ -189,45 +188,34 @@ if goto == 1:
     if mode == 2:                           # 히든 보존
         itermax = len(stream_h); flag = 2
 
-    dummy_mixed = b'' ;   vd = stream_d;  vh = stream_h
-    # for i in range(len(stream_d)):
-    #     vd.append(stream_d[i])
-    # for i in range(len(stream_h)):
-    #     vh.append(stream_h[i])
+    dummy_mixed = b'';   vd = stream_d;  vh = stream_h
 
     if cdx == 2:
         ## 역히든의 에뮬레이션 방지 처리 000001 000002 000003
         for i in range(len(vh)):
-            vh[i] = (re.sub(b'\x00\x00\x01', b'\xE3\x00\xD0\x01\xC5', vh[i][:2:-1]) + vh[i][:3][::-1] )[::-1]
-            vh[i] = (re.sub(b'\x00\x00\x02', b'\xE3\x00\xD0\x02\xC5', vh[i][:2:-1]) + vh[i][:3][::-1] )[::-1]
-            vh[i] = (re.sub(b'\x00\x00\x03', b'\xE3\x00\xD0\x03\xC5', vh[i][:2:-1]) + vh[i][:3][::-1] )[::-1]
-        ## 정히든의 에뮬레이션 방지 처리 000001 000002 000003        ?!?!?!?! 이게 왜 필요하지 ?! 필요하네
+            vh[i] = (re.sub(b'\x00\x00\x01', b'\xE3\x00\xD0\x01\xC5', vh[i][:2:-1]) + vh[i][:3][::-1])[::-1]
+            vh[i] = (re.sub(b'\x00\x00\x02', b'\xE3\x00\xD0\x02\xC5', vh[i][:2:-1]) + vh[i][:3][::-1])[::-1]
+            vh[i] = (re.sub(b'\x00\x00\x03', b'\xE3\x00\xD0\x03\xC5', vh[i][:2:-1]) + vh[i][:3][::-1])[::-1]
+        ## 정히든의 에뮬레이션 방지 처리 000001 000002 000003
         for i in range(len(vh)):
             vh[i] = vh[i][:3] + re.sub(b'\x00\x00\x01', b'\xE3\x00\xD0\x01\xC5', vh[i][3:])
             vh[i] = vh[i][:3] + re.sub(b'\x00\x00\x02', b'\xE3\x00\xD0\x02\xC5', vh[i][3:])
             vh[i] = vh[i][:3] + re.sub(b'\x00\x00\x03', b'\xE3\x00\xD0\x03\xC5', vh[i][3:])
     if cdx == 0:
         for i in range(len(vh)):
-            vh[i] = (re.sub(b'\x00\x00\x01', b'\xE3\x00\xD0\x01\xC5', vh[i][:2:-1]) + vh[i][:3][::-1] )[::-1]
+            vh[i] = (re.sub(b'\x00\x00\x01', b'\xE3\x00\xD0\x01\xC5', vh[i][:2:-1]) + vh[i][:3][::-1])[::-1]
         for i in range(len(vh)):
             vh[i] = vh[i][:3] + re.sub(b'\x00\x00\x01', b'\xE3\x00\xD0\x01\xC5', vh[i][3:])
     if cdx == 1:
         for i in range(len(vh)):
-            vh[i] = (re.sub(b'\x00\x00\x80', b'\xE3\x00\xD0\x80\xC5', vh[i][:2:-1]) + vh[i][:3][::-1] )[::-1]
+            vh[i] = (re.sub(b'\x00\x00\x80', b'\xE3\x00\xD0\x80\xC5', vh[i][:2:-1]) + vh[i][:3][::-1])[::-1]
         for i in range(len(vh)):
             vh[i] = vh[i][:3] + re.sub(b'\x00\x00\x80', b'\xE3\x00\xD0\x80\xC5', vh[i][3:])
 
-        # VPS: x40, x41
-        # SPS: x42, x43
-        # PPS: x44
-        # SEI: x4E
-        # IDR Frame: x26
-
     aa = len(vd)
     bb = len(vh); n = 0
-    if flag == 1: # 더미 길이에 맞춤
+    if flag == 1:       # 더미 길이에 맞춤
         for i in range(itermax):
-            # [\x00|\xAF|\xB0|\xB1|\xB2|\xB3|\xB6|\xB7] # PPS: xB3,B6
             if (cdx == 4):
                 if vd[i % aa][3] == 0xAF or vd[i % aa][3] == 0xB0 or vd[i % aa][3] == 0xB1 or vd[i % aa][3] == 0xB2 or vd[i % aa][3] == 0xB3 or vd[i % aa][3] == 0xB6 or vd[i % aa][3] == 0xB7:
                     dummy_mixed = dummy_mixed + vd[i%aa];                           n+=1
@@ -244,7 +232,7 @@ if goto == 1:
                 else:
                     dummy_mixed = dummy_mixed + vd[i%aa] + vh[(i-n)%bb][::-1]
             if (cdx == 0):
-                if vd[i%aa][3] == 0xB3 or vd[i%aa][3] == 0xB8 :                              # SPS GOP
+                if vd[i%aa][3] == 0xB3 or vd[i%aa][3] == 0xB8:                              # SPS GOP
                     dummy_mixed = dummy_mixed + vd[i%aa];                           n+=1
                 else:
                     dummy_mixed = dummy_mixed + vd[i%aa] + vh[(i-n)%bb][::-1]
@@ -252,7 +240,7 @@ if goto == 1:
                 dummy_mixed = dummy_mixed + vd[i%aa] + vh[(i-n)%bb][::-1]
     elif flag == 2: # 히든 길이에 맞춤
         i = 0
-        while i < itermax+n: # +n의 차이만 있다.
+        while i < itermax+n:        # +n의 차이만 있다.
             if (cdx == 4):
                 if vd[i % aa][3] == 0xAF or vd[i % aa][3] == 0xB0 or vd[i % aa][3] == 0xB1 or vd[i % aa][3] == 0xB2 or vd[i % aa][3] == 0xB3 or vd[i % aa][3] == 0xB6 or vd[i % aa][3] == 0xB7:
                     dummy_mixed = dummy_mixed + vd[i%aa];                          i+=1; n+=1
@@ -290,7 +278,6 @@ elif goto == 2:
     print("복호 모드 진행 중")
     f_str = open(sys.argv[1], 'rb')
     stream = f_str.read()
-
     stream, cdx = codecdecision(stream)
 
     print(" NALU: ", len(stream))
@@ -302,12 +289,6 @@ elif goto == 2:
                 del stream[i]; i-=1
             else:
                 i += 1
-
-    # VPS: x40, x41
-    # SPS: x42, x43
-    # PPS: x44
-    # SEI: x4E
-    # IDR Frame: x26
 
     if (cdx == 3):
         i = 0
@@ -331,13 +312,10 @@ elif goto == 2:
             else:
                 i += 1
 
-
     if (cdx == 4):
         ## 뒤집힌 더미에서 발생하는 스타트코드 삭제처리
         for i in range(len(stream)):
             stream[i] = re.split(b'\x00\x00\x01', stream[i][-4::-1])[0][-4::-1] + stream[i][-3:]
-       #     stream[i] = re.split(b'\x00\x00\x02', stream[i][-4::-1])[0][-4::-1] + stream[i][-3:]
-       #     stream[i] = re.split(b'\x00\x00\x03', stream[i][-4::-1])[0][-4::-1] + stream[i][-3:]
         ## 정히든의 에뮬레이션 방지 처리 되돌리기 000001 000002 000003
         for i in range(len(stream)):
             stream[i] = re.sub(b'\xE3\x00\xD0\x01\xC5', b'\x00\x00\x01', stream[i][::-1])[::-1]
@@ -353,8 +331,6 @@ elif goto == 2:
         ## 뒤집힌 더미에서 발생하는 스타트코드 삭제처리
         for i in range(len(stream)):
             stream[i] = re.split(b'\x00\x00\x01', stream[i][-4::-1])[0][-4::-1] + stream[i][-3:]
-       #     stream[i] = re.split(b'\x00\x00\x02', stream[i][-4::-1])[0][-4::-1] + stream[i][-3:]
-       #     stream[i] = re.split(b'\x00\x00\x03', stream[i][-4::-1])[0][-4::-1] + stream[i][-3:]
         ## 정히든의 에뮬레이션 방지 처리 되돌리기 000001 000002 000003
         for i in range(len(stream)):
             stream[i] = re.sub(b'\xE3\x00\xD0\x01\xC5', b'\x00\x00\x01', stream[i][::-1])[::-1]
@@ -383,22 +359,18 @@ elif goto == 2:
             stream[i] = re.sub(b'\xE3\x00\xD0\x02\xC5', b'\x00\x00\x02', stream[i])
             stream[i] = re.sub(b'\xE3\x00\xD0\x03\xC5', b'\x00\x00\x03', stream[i])
     if (cdx == 0):
-        for i in range(len(stream)):        ## 뒤집힌 더미에서 발생하는 스타트코드 삭제처리
+        ## 뒤집힌 더미에서 발생하는 스타트코드 삭제처리
+        for i in range(len(stream)):
             stream[i] = re.split(b'\x00\x00\x01', stream[i][-4::-1])[0][-4::-1] + stream[i][-3:]
-        for i in range(len(stream)):        ## 정히든의 에뮬레이션 방지 처리 되돌리기 000001 000002 000003
+        ## 정히든의 에뮬레이션 방지 처리 되돌리기 000001 000002 000003
+        for i in range(len(stream)):
             stream[i] = re.sub(b'\xE3\x00\xD0\x01\xC5', b'\x00\x00\x01', stream[i][::-1])[::-1]
-        for i in range(len(stream)):        ## 역히든의 에뮬레이션 방지 처리 되돌리기 000001 000002 000003
+        ## 역히든의 에뮬레이션 방지 처리 되돌리기 000001 000002 000003
+        for i in range(len(stream)):
             stream[i] = re.sub(b'\xE3\x00\xD0\x01\xC5', b'\x00\x00\x01', stream[i])
-
-    # VPS: x40, x41
-    # SPS: x42, x43
-    # PPS: x44
-    # SEI: x4E
-    # IDR Frame: x26
 
     if (cdx == 4):
         for i in range(len(stream)):
-            # [\x00|\xAF|\xB0|\xB1|\xB2|\xB3|\xB6|\xB7] # PPS: xB3,B6
             if stream[i][::-1][3] == 0xAF or stream[i][::-1][3] == 0xB0 or stream[i][::-1][3] == 0xB1 or stream[i][::-1][3] == 0xB2 or stream[i][::-1][3] == 0xB3 or stream[i][::-1][3] == 0xB6 or stream[i][::-1][3] == 0xB7:  # 히든의 pps는 단독으로 써야하니 종료코드 확인해서 자른다
                 stream[i] = re.split(b'\x55\x56\x57', stream[i][::-1])[0][::-1]
     if (cdx == 3):
@@ -423,8 +395,7 @@ elif goto == 2:
     if (cdx==3): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_restored.hevc', 'wb'); src = "ffmpeg.exe -y -i "           + os.path.splitext(sys.argv[1])[0] + "_restored.hevc "              + os.path.splitext(sys.argv[1])[0] + "_restored.yuv"
     if (cdx==4): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_restored.bit', 'wb');  src = "ldecod_ivc.exe "             + os.path.splitext(sys.argv[1])[0] + "_restored.bit "               + os.path.splitext(sys.argv[1])[0] + "_restored.yuv"
 
-    f_bin.write(reversed_stream)        # 히든 스트림 만드는것
-    #subprocess.call(src)                # 디코딩해서 yuv만드는 것
+    f_bin.write(reversed_stream)
     f_bin.close()
     f_str.close()
 
@@ -441,8 +412,6 @@ elif goto == 3:
         ## 뒤집힌 더미에서 발생하는 스타트코드 삭제처리
         for i in range(len(stream)):
             stream[i] = re.split(b'\x00\x00\x01', stream[i][-4::-1])[0][-4::-1] + stream[i][-3:]
-       #     stream[i] = re.split(b'\x00\x00\x02', stream[i][-4::-1])[0][-4::-1] + stream[i][-3:]
-       #     stream[i] = re.split(b'\x00\x00\x03', stream[i][-4::-1])[0][-4::-1] + stream[i][-3:]
         ## 정히든의 에뮬레이션 방지 처리 되돌리기 000001 000002 000003
         for i in range(len(stream)):
             stream[i] = re.sub(b'\xE3\x00\xD0\x01\xC5', b'\x00\x00\x01', stream[i][::-1])[::-1]
@@ -457,8 +426,6 @@ elif goto == 3:
         ## 뒤집힌 더미에서 발생하는 스타트코드 삭제처리
         for i in range(len(stream)):
             stream[i] = re.split(b'\x00\x00\x01', stream[i][-4::-1])[0][-4::-1] + stream[i][-3:]
-       #     stream[i] = re.split(b'\x00\x00\x02', stream[i][-4::-1])[0][-4::-1] + stream[i][-3:]
-       #     stream[i] = re.split(b'\x00\x00\x03', stream[i][-4::-1])[0][-4::-1] + stream[i][-3:]
         ## 정히든의 에뮬레이션 방지 처리 되돌리기 000001 000002 000003
         for i in range(len(stream)):
             stream[i] = re.sub(b'\xE3\x00\xD0\x01\xC5', b'\x00\x00\x01', stream[i][::-1])[::-1]
@@ -486,13 +453,15 @@ elif goto == 3:
             stream[i] = re.sub(b'\xE3\x00\xD0\x02\xC5', b'\x00\x00\x02', stream[i])
             stream[i] = re.sub(b'\xE3\x00\xD0\x03\xC5', b'\x00\x00\x03', stream[i])
     if (cdx == 0):
-        for i in range(len(stream)):        ## 뒤집힌 더미에서 발생하는 스타트코드 삭제처리
+        ## 뒤집힌 더미에서 발생하는 스타트코드 삭제처리
+        for i in range(len(stream)):
             stream[i] = re.split(b'\x00\x00\x01', stream[i][-4::-1])[0][-4::-1] + stream[i][-3:]
-        for i in range(len(stream)):        ## 정히든의 에뮬레이션 방지 처리 되돌리기 000001 000002 000003
+        ## 정히든의 에뮬레이션 방지 처리 되돌리기 000001 000002 000003
+        for i in range(len(stream)):
             stream[i] = re.sub(b'\xE3\x00\xD0\x01\xC5', b'\x00\x00\x01', stream[i][::-1])[::-1]
-        for i in range(len(stream)):        ## 역히든의 에뮬레이션 방지 처리 되돌리기 000001 000002 000003
+        ## 역히든의 에뮬레이션 방지 처리 되돌리기 000001 000002 000003
+        for i in range(len(stream)):
             stream[i] = re.sub(b'\xE3\x00\xD0\x01\xC5', b'\x00\x00\x01', stream[i])
-
 
     ttb = 0
     d0 = b'(\x00\x00\x01[\xB0-\xB5])'  # mpeg2
@@ -502,7 +471,6 @@ elif goto == 3:
     d3 = b'(\x00\x00\x01[\x40|\x41|\x42|\x43|\x44|\x4E|\x26|\x28|\x00|\x02|\x2A|\x10|\x12])'  # hevc 40, 41: VPS, 42, 43: SPS, 44: PPS, 4E: SEI, 26: IDR Frame
     d3_ex = b'(\x00\x00\x01\x00[\x1F|\x01|\x80|\x00])'
     d4 = b'(\x00\x00\x01[\x00|\xAF|\xB0|\xB1|\xB2|\xB3|\xB6|\xB7])'  # IVC
-
 
     for i in range(len(stream)):
         if cdx is 0:
@@ -526,12 +494,11 @@ elif goto == 3:
                 if re.match(d4, stream[i][::-1]).lastindex is 1: ttb += 1
             except: pass
 
-
     tta +=1
     if (ttb / tta) > 0.4:
         print("(NALU: %d  ratio: %.2f)" % (tta, ttb / tta), "scenario found: dummy-hidden.")
     else:
-        #print("(NALU: %d  ratio: %.2f)" % (tta, ttb / tta), "숨겨진 영상이 존재하지 않습니다.")  # 없을땐 보이지 않도록하자 (임시)
+        #print("(NALU: %d  ratio: %.2f)" % (tta, ttb / tta), "숨겨진 영상이 존재하지 않습니다.")  # 없을땐 프린트x (임시)
         None
 
 #########################################################################################################

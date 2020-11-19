@@ -246,14 +246,14 @@ def xor_fast_bitstream(stream, none=0, flag=0):
     part = len(stream)
     stream1 = stream.bin
     stream2 = stream.bin[1:]
-    for ii in range(0, part-32, 32):            # 32배수로 돈다
+    for ii in range(0, part-32, 32):            # 32bits(8bytes)단위로 연산
         a = int(stream1[ii:ii+32], base=2)
         b = int(stream2[ii:ii+32], base=2)
         c = (a^b).to_bytes(4, byteorder='big')
         result += c; i = ii+32
-    remain = part - i                          # 32미만으로 남았을때
+    remain = part - i                           # 남은 비트스트림이 32bits 미만으로 남았을때
     remain_b = remain // 8
-    remain_b += bool(remain % 8)                # 올림처리 위해
+    remain_b += bool(remain % 8)                # 올림처리
     a = int(stream1[i:i+remain], base=2)
     if remain == 1: b = 0                       # 1bit 남은 경우 읽을 bit이 0이라 오류
     else:

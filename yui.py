@@ -22,8 +22,8 @@ def isHangul(text):
     return hanCount > 0
 
 def close_ask(win,vid,w,h):
-    vid.i_width  = int(''.join(list(filter(str.isdigit,w.get(0.0,'end')))))
-    vid.i_height = int(''.join(list(filter(str.isdigit,h.get(0.0,'end')))))
+    vid.i_width  = int(''.join(list(filter(str.isdigit,w.get(0.0, 'end')))))
+    vid.i_height = int(''.join(list(filter(str.isdigit,h.get(0.0, 'end')))))
     win.destroy()
 
 def NewYuv_Askwindow(vid):
@@ -51,12 +51,9 @@ def NewYuv_Askwindow(vid):
         text_height.place(x=130, y=83)
         button_0.place(x=20, y=160)
 
-        while tkinter.Toplevel.winfo_exists(askpop_win): time.sleep(0.1);  askpop_win.update();          # 완료 되기전까진 ask창 잡아두며 리플레시
+        while tkinter.Toplevel.winfo_exists(askpop_win): time.sleep(0.1);  askpop_win.update();          # 완료 되기전까진 ask창 잡아두며 refresh
 
-    vid.frame_count = os.path.getsize(vid.video_source) // int(vid.i_width * vid.i_height * 1.5)                  # 프레임수 입력
-
-
-
+    vid.frame_count = os.path.getsize(vid.video_source) // int(vid.i_width * vid.i_height * 1.5)         # 프레임수 입력
 
 
 class VideoCaptureYUV:
@@ -219,9 +216,8 @@ class LoadDisplay(object):  # ui 영상창 클래스
                         print('오류디스플레이 출력')
                         ret, self.frame = self.get_frame()
             else:
-                print("@@@@@@@@@@@@@@@@@@@@@@@@@@@")  ## 영상 노존재
+                print("@@@@@@@@@@@@@@@@@@@@@@@@@@@")  ## 영상이 존재하지 않음
                 print("error, file not exist in %s" % self.video_source)
-                ## 에러영상 메세지 디스플레이기능 넣기
                 self.video_source = ""
                 return set_srctext_and_return('')
 
@@ -242,7 +238,8 @@ class LoadDisplay(object):  # ui 영상창 클래스
                     subprocess.run("ffmpeg.exe -f rawvideo -s %dx%d -pix_fmt yuv420p -i %s -c:v hevc -y %s.hevc" % (width, height, yuv_src, yuv_srcn), stdout=subprocess.DEVNULL)
                     # if os.path.isfile(os.path.splitext(yuv_src)[0] + '.hevc'): 파일이존재하지않을이유는없을걸
                 if 'yuv_src' in vars():
-                    if os.path.getsize(yuv_srcn + '.hevc') > 1:      self.vid = cv2.VideoCapture(yuv_srcn + '.hevc')    # 존재, 용량있음, 띄우기
+                    if os.path.getsize(yuv_srcn + '.hevc') > 1:
+                        self.vid = cv2.VideoCapture(yuv_srcn + '.hevc')    # 존재, 용량있음, 띄우기
                 else:       # IVC 디코더로 디코딩 불가시 시퀀스는 에러(변조)영상 화면상에 에러 메세지 띄우기
                     self.vid = cv2.VideoCapture('errd1.png')
                     print('오류디스플레이 출력')
@@ -499,7 +496,6 @@ def scenario_act(event):            # 이 함수는 input stream 버튼을 눌�
             vid1.changevideo(srcs[0])
             return
 
-
     # combobox 리스트를 통한 접근시
     srcs = srcs_g.count
     if len(srcs) == 0:  return     # 입력영상을 아직 선택하지 않았을 경우 그냥 아웃
@@ -555,7 +551,7 @@ def scenario_act(event):            # 이 함수는 input stream 버튼을 눌�
                 try:
                     non_block_threading_popen(text_1_3, "python.exe JPEG.py %s %d" % (seq1, 0))
                     seq2 = src_plus_name + '_Distorted' + ext
-                    vid2.changevideo(seq2) if os.path.isfile(seq2) else print_dual(text_1_3, '%s 존재하지 않음' % seq2)
+                    vid2.changevideo(seq2); print_dual(text_1_3, '변조가 완료되었습니다.') if os.path.isfile(seq2) else print_dual(text_1_3, '%s 존재하지 않음' % seq2)
                 except:
                     print_dual(text_1_3, 'JPEG 양자화 테이블 변조가 불가합니다.')
             else:
@@ -567,7 +563,7 @@ def scenario_act(event):            # 이 함수는 input stream 버튼을 눌�
                 try:
                     non_block_threading_popen(text_1_3, "python.exe bmp_scenario.py %s %d" % (seq1, 0))
                     seq2 = src_plus_name + '_Distorted' + ext
-                    vid2.changevideo(seq2) if os.path.isfile(seq2) else print_dual(text_1_3, '%s 존재하지 않음' % seq2)
+                    vid2.changevideo(seq2); print_dual(text_1_3, '변조가 완료되었습니다.') if os.path.isfile(seq2) else print_dual(text_1_3, '%s 존재하지 않음' % seq2)
                 except:
                     print_dual(text_1_3, 'BMP 변조가 불가합니다.')
             else:
@@ -579,7 +575,7 @@ def scenario_act(event):            # 이 함수는 input stream 버튼을 눌�
                 try:
                     non_block_threading_popen(text_1_3, "python.exe png_scenario.py %s %d" % (seq1, 0))
                     seq2 = src_plus_name + '_Distorted' + ext
-                    vid2.changevideo(seq2) if os.path.isfile(seq2) else print_dual(text_1_3, '%s 존재하지 않음' % seq2)
+                    vid2.changevideo(seq2); print_dual(text_1_3, '변조가 완료되었습니다.') if os.path.isfile(seq2) else print_dual(text_1_3, '%s 존재하지 않음' % seq2)
                 except:
                     print_dual(text_1_3, 'PNG 변조가 불가합니다.')
             else:
@@ -591,7 +587,7 @@ def scenario_act(event):            # 이 함수는 input stream 버튼을 눌�
                 try:
                     non_block_threading_popen(text_1_3, "python.exe tiff_scenario.py %s %d" % (seq1, 0))
                     seq2 = src_plus_name + '_Distorted' + ext
-                    vid2.changevideo(seq2) if os.path.isfile(seq2) else print_dual(text_1_3, '%s 존재하지 않음' % seq2)
+                    vid2.changevideo(seq2); print_dual(text_1_3, '변조가 완료되었습니다.') if os.path.isfile(seq2) else print_dual(text_1_3, '%s 존재하지 않음' % seq2)
                 except:
                     print_dual(text_1_3, 'TIFF 변조가 불가합니다.')
             else:
@@ -599,9 +595,6 @@ def scenario_act(event):            # 이 함수는 input stream 버튼을 눌�
 
         print_dual(text_1_3, "　")
         window.focus_force()
-        # winsound.PlaySound('SystemQuestion', winsound.SND_ALIAS)  # 사운드에 딜레이가 포함되어 있음
-        # time.sleep(0.5)
-
 
 #########################################################################################################
 #   복조과정
@@ -752,7 +745,6 @@ def scenario_inv_act():
 
         print_dual(text_2_3, " ")           # 파일간 사이 공백
         window.focus_force()
-        # winsound.PlaySound('SystemQuestion', winsound.SND_ALIAS)
         time.sleep(0.2)
 
 
@@ -797,19 +789,16 @@ def encoding_act(event):            # 이 함수는 input stream 버튼을 눌�
     for iii, seq3 in enumerate(srcs2):
         if seq3 == '' and event.widget.current() != 9: print_dual(text_3_3, 'input stream을 지정해 주세요');   return
 
-        vid5.changevideo(seq3)  # 입력영상 띄우기          # yuv 파일의 경우 src입력 영상을 띄우는 순간  ->   파일이름을통한 가로세로길이인식과정 or 가로세로 ask창 뜸   -> 이 때 i_width i_height 완성
+        vid5.changevideo(seq3)  # 입력영상 띄우기 # yuv 파일의 경우 src입력 영상을 띄우는 순간  ->   파일이름을통한 가로세로길이인식과정 or 가로세로 ask창 뜸   -> 이 때 i_width i_height 완성
         width2 = vid5.i_width
         height2 = vid5.i_height
         fcount = vid5.frame_count
 
         src_plus_name2 = os.path.splitext(seq3)[0]   # 파일경로+파일이름
         ext2 = os.path.splitext(seq3)[1]             # 확장자
-        name2 = os.path.basename(src_plus_name2)      # 파일이름
-
-
+        name2 = os.path.basename(src_plus_name2)     # 파일이름
 
         print_dual(text_3_3, f'({iii + 1}/{len(srcs2)}) {name2}{ext2}')
-
 
         if 'yuv to mpeg2' in event.widget.get():  ## yuv to mpeg2
             print_dual(text_3_3, 'yuv → mpeg2 인코딩 중 입니다..')
@@ -887,11 +876,8 @@ def encoding_act(event):            # 이 함수는 input stream 버튼을 눌�
             vid6.changevideo(src_plus_name2 + '.tiff')
             print_dual(text_3_3, '인코딩이 완료되었습니다.')
 
-
         print_dual(text_3_3, "　")
         window.focus_force()
-        # winsound.PlaySound('SystemQuestion', winsound.SND_ALIAS)  # 사운드에 딜레이가 포함되어 있음
-        # time.sleep(0.5)
 
 #########################################################################################################
 #   UI 관련 코드
@@ -924,7 +910,6 @@ def release(event):
         ddd(vid3, sli2)
     elif event.widget.master.winfo_name() == '!frame3':
         ddd(vid5, sli3)
-
 
 def sliderdrag(event):
     # time.sleep(0.02)
@@ -972,16 +957,9 @@ States_labelframe_1.pack()
 yscrollbar = Scrollbar(States_labelframe_1)
 yscrollbar.pack(side="right", fill="both")
 
-# text_1_1 = Text(Origin_labelframe_1, width=50, height=20)
-# text_1_2 = Text(Modified_labelframe_1, width=50, height=20)
+
 text_1_3 = Text(States_labelframe_1, width=113, height=13, wrap=NONE, yscrollcommand=yscrollbar.set)
-
-# text_1_1.insert(tkinter.INSERT, '''Origin''')
-# text_1_2.insert(tkinter.INSERT, '''Modified''')
 text_1_3.insert(tkinter.INSERT, '''''')
-
-# text_1_1.pack()
-# text_1_2.pack()
 text_1_3.pack()
 
 # Configure the scrollbars
@@ -992,9 +970,6 @@ slider_1 = Scale(frame1, from_=1, to=101, orient=HORIZONTAL, length=810, variabl
 slider_1.bind("<B1-Motion>", sliderdrag)
 slider_1.bind("<ButtonRelease-1>", release)
 slider_1.pack()
-
-# btn_1_2 = tkinter.Button(frame1, text="ㅁ")
-# btn_1_3 = tkinter.Button(frame1, text=">>")
 
 #########################################################################################################
 #   Tap 2
@@ -1014,16 +989,8 @@ States_labelframe_2.pack()
 yscrollbar = Scrollbar(States_labelframe_2)
 yscrollbar.pack(side="right", fill="both")
 
-# text_2_1 = Text(Origin_labelframe_2, width=50, height=20)
-# text_2_2 = Text(Modified_labelframe_2, width=50, height=20)
 text_2_3 = Text(States_labelframe_2, width=113, height=13, wrap=NONE, yscrollcommand=yscrollbar.set)
-
-# text_2_1.insert(tkinter.INSERT, '''Modified''')
-# text_2_2.insert(tkinter.INSERT, '''Recovered''')
 text_2_3.insert(tkinter.INSERT, '''''')
-
-# text_2_1.pack()
-# text_2_2.pack()
 text_2_3.pack()
 
 # Configure the scrollbars
@@ -1034,8 +1001,6 @@ combo_1_2 = Combobox(frame1)
 combo_1_2['values'] = ("Scenario-1 inverse", "Scenario-2 xor", "Scenario-3 더미-히든", "Scenario-4 start code", "Scenario-5 jpg, j2k", "Scenario-6 bmp", "Scenario-7 png", "Scenario-8 tiff")
 combo_1_2.bind("<<ComboboxSelected>>", lambda event: canvas_loading.show() or scenario_act(event) or window.focus_force() or canvas_loading.forget())  # 함수 주소 전달
 combo_1_2.current(0)  # set the selected item
-
-# combo_1_1.place(x=150, y=0)
 combo_1_2.place(x=150, y=10)
 
 sli2 = DoubleVar()
@@ -1043,7 +1008,6 @@ slider_2 = Scale(frame2, from_=1, to=101, orient=HORIZONTAL, length=810, variabl
 slider_2.bind("<B1-Motion>", sliderdrag)
 slider_2.bind("<ButtonRelease-1>", release)
 slider_2.pack()
-
 
 #########################################################################################################
 #   Tap 3
@@ -1086,22 +1050,8 @@ slider_3.bind("<B1-Motion>", sliderdrag)
 slider_3.bind("<ButtonRelease-1>", release)
 slider_3.pack()
 
-
-# button click event set
-# btn_1 = tkinter.Button(window, text='input sequence & encode', command=lambda: vid1.changevideo(), compound=LEFT)
-# btn_2 = tkinter.Button(window, text='distortion', command=lambda: vid2.changevideo(), compound=LEFT)
-# btn_3 = tkinter.Button(window, text='load model & classify', command=lambda: vid3.changevideo(), compound=LEFT)
-# btn_4 = tkinter.Button(window, text='recover', command=lambda: vid4.changevideo(), compound=LEFT)
-
-# text_1_1 = Text(frame1,width = 10,height=1 )
 btn_1_1 = tkinter.Button(frame1, text="input stream", command=lambda: scenario_act('askmode') or vid2.changevideo('close'))
-# btn_1_2 = tkinter.Button(frame1, text="Encode", command=lambda: vid2.detect(text_1_3, combo_1_2.current()+1, codec_list.index(os.path.splitext(vid1.video_source)[1]), os.path.splitext(vid1.video_source)[0]))
-# vid2.detect(text_1_3)
-# vid2.detect(text_1_3, combo_1_2.current()+1, codec_list.index(os.path.splitext(vid1.video_source)[1]), os.path.splitext(vid1.video_source)[0])
-# detect.main(combo_1_2.current(),3,vid1.video_source)
-# text_2_1 = Text(frame2,width = 10,height=1 )
 btn_2_1 = tkinter.Button(frame2, text="restore stream", command=lambda: scenario_inv_act() or window.focus_force())  # 프로세스 종료되면 윈도우가 깜빡이도록 알람
-# btn_2_2 = tkinter.Button(frame2, text="Decode", command=lambda: vid4.detect_inv(text_2_3, os.path.splitext(vid3.video_source)))
 btn_3_1 = tkinter.Button(frame3, text="encoding", command=lambda: encoding_act('askmode'))
 
 # button position
@@ -1196,8 +1146,10 @@ class canvas_loding_class:
 
 canvas_loading = canvas_loding_class(290, 290, 250, 200)
 
-for filename in glob("tmp_file*"): os.remove(filename)
+for filename in glob("tmp_file*"):
+    os.remove(filename)
 srcs_g('')  # 전역변수 초기화
 
 window.mainloop()
-for filename in glob("tmp_file*"): os.remove(filename)
+for filename in glob("tmp_file*"):
+    os.remove(filename)
