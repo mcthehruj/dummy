@@ -98,7 +98,7 @@ if goto == 1:
     if(cdx != cdx2): print("코덱을 일치시키시오"); exit(1)
     if  (cdx == 0): ext = '.m2v'
     elif(cdx == 1): ext = '.h263'
-    elif(cdx == 2): ext = '.264'
+    elif(cdx == 2): ext = '.h264'
     elif(cdx == 3): ext = '.hevc'
     elif(cdx == 4): ext = '.bit'    #IVC
 
@@ -391,7 +391,7 @@ elif goto == 2:
         reversed_stream = reversed_stream + stream[i][::-1]
     if (cdx==0): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_restored.m2v', 'wb');  src = "ffmpeg.exe -y -i "           + os.path.splitext(sys.argv[1])[0] + "_restored.m2v "               + os.path.splitext(sys.argv[1])[0] + "_restored.yuv"
     if (cdx==1): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_restored.h263', 'wb'); src = "ffmpeg.exe -y -i "           + os.path.splitext(sys.argv[1])[0] + "_restored.h263 "              + os.path.splitext(sys.argv[1])[0] + "_restored.yuv"
-    if (cdx==2): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_restored.264', 'wb');  src = "ldecod.exe -p InputFile="    + os.path.splitext(sys.argv[1])[0] + "_restored.264 -p OutputFile=" + os.path.splitext(sys.argv[1])[0] + "_restored.yuv"
+    if (cdx==2): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_restored.h264', 'wb');  src = "ldecod.exe -p InputFile="    + os.path.splitext(sys.argv[1])[0] + "_restored.h264 -p OutputFile=" + os.path.splitext(sys.argv[1])[0] + "_restored.yuv"
     if (cdx==3): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_restored.hevc', 'wb'); src = "ffmpeg.exe -y -i "           + os.path.splitext(sys.argv[1])[0] + "_restored.hevc "              + os.path.splitext(sys.argv[1])[0] + "_restored.yuv"
     if (cdx==4): f_bin = open(os.path.splitext(sys.argv[1])[0] + '_restored.bit', 'wb');  src = "ldecod_ivc.exe "             + os.path.splitext(sys.argv[1])[0] + "_restored.bit "               + os.path.splitext(sys.argv[1])[0] + "_restored.yuv"
 

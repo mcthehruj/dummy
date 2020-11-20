@@ -751,7 +751,7 @@ def scenario_inv_act():
 #########################################################################################################
 #   인코딩 과정
 #   ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -c:v mpeg2video -y akiyo_cif.m2v
-#   ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -c:v h263p -y akiyo_cif.h263
+#   ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -c:v h263 -y akiyo_cif.h263
 #   ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -c:v h264 -y akiyo_cif.h264
 #   ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -c:v hevc -y akiyo_cif.hevc
 #   ffmpeg.exe -f rawvideo -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -c:v libvpx -y akiyo_cif.webm
@@ -762,12 +762,6 @@ def scenario_inv_act():
 #   ffmpeg -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -frames:v 1 akiyo_cif.png
 #   ffmpeg -s 352x288 -pix_fmt yuv420p -i akiyo_cif_300f.yuv -frames:v 1 akiyo_cif.tiff
 #########################################################################################################
-
-########################################################################################################################
-
-                                                ## 인코더 파트 ##
-
-########################################################################################################################
 
 def encoding_act(event):            # 이 함수는 input stream 버튼을 눌러도 호출되고 combobox를 선택해도 호출됨 event 인자의 차이
     if event == 'askmode':          # input stream 버튼을 통한 접근시
@@ -809,7 +803,7 @@ def encoding_act(event):            # 이 함수는 input stream 버튼을 눌�
 
         elif 'yuv to h.263' in event.widget.get():  ## yuv to h.263
             print_dual(text_3_3, 'yuv → h.263 인코딩 중 입니다..')
-            subprocess.run("ffmpeg.exe -f rawvideo -s %sx%s -pix_fmt yuv420p -i %s -c:v h263p -y %s.h263" % (
+            subprocess.run("ffmpeg.exe -f rawvideo -s %sx%s -pix_fmt yuv420p -i %s -c:v h263 -y %s.h263" % (
                 width2, height2, seq3, src_plus_name2), stdout=subprocess.DEVNULL)
             vid6.changevideo(src_plus_name2 + '.h263')
             print_dual(text_3_3, '인코딩이 완료되었습니다.')
