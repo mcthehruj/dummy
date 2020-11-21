@@ -152,7 +152,7 @@ def Distortion_JPEG(Bin_Jpeg):
 
 
 def Distortion_J2k(Bin_J2k):
-    QCD_MARKER = b'\xff\x5c'
+    QCD_MARKER = b'\xff\x5c\x00\x13'
 
     loc = Find_Marker(Bin_J2k, QCD_MARKER)
 
@@ -183,7 +183,7 @@ def Candidate_JPEG(Bin_Jpeg, mode):
 
 
 def Candidate_J2k(Bin_J2k, mode):
-    QCD_MARKER = b'\xff\x5c'
+    QCD_MARKER = b'\xff\x5c\x00\x13'
 
     loc = Find_Marker(Bin_J2k, QCD_MARKER)[0] # QCD 마커의 위치를 찾는다.
 

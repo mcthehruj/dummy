@@ -476,13 +476,12 @@ if __name__ == "__main__":
             gop = []                                                                            # None
             psc = []                                                                            # None
             start = True
-
-        elif predicted_codec_.index(max(predicted_codec_)) == 7:                                              # JPEG2000
-            ssc = [hex2bin('ff4f')]                                                             # sc
-            sec = [hex2bin('ff90')]                                                             # sot
-            gop = [hex2bin('ff93')]                                                             # sod
+        elif predicted_codec_.index(max(predicted_codec_)) == 7:                                # JPEG2000
+            ssc = [hex2bin('0000000c6a50')]                                                     # sc
+            sec = [hex2bin('667479706a70')]                                                     # sot
+            gop = []                                                                            # sod
             psc = []                                                                            # siz
-            start = False
+            start = True
 
         elif predicted_codec_.index(max(predicted_codec_)) == 8:                                              # BMP
             ssc = [hex2bin('424d')]                                                             # hd1
